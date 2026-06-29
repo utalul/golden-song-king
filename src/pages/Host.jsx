@@ -11,6 +11,16 @@ import Input from "../components/ui/Input";
 
 export default function Host() {
   const [hostName, setHostName] = useState("");
+  const [category, setCategory] = useState("all");
+
+  const categories = [
+    { value: "all", label: "🎵 全部歌曲" },
+    { value: "mandarin", label: "🇹🇼 華語流行" },
+    { value: "taiwanese", label: "🎤 台語經典" },
+    { value: "western", label: "🌍 西洋歌曲" },
+    { value: "anime", label: "🎌 動漫歌曲" },
+    { value: "kpop", label: "🇰🇷 K-POP" },
+  ];
 
   const createRoom = async () => {
     if (!hostName.trim()) {
@@ -36,12 +46,14 @@ export default function Host() {
       ];
 
     await addDoc(
-      collection(db, "rooms"),
-      {
-        roomId,
-        hostName,
+  collection(db, "rooms"),
+  {
+    roomId,
+    hostName,
 
-        status: "waiting",
+    category,
+
+    status: "waiting",
 
         gameRound: 1,
 
@@ -154,17 +166,25 @@ export default function Host() {
 
               </div>
 
-              <div className="mt-2 font-bold text-white">
+             <div className="rounded-2xl border border-slate-700 bg-slate-900 p-4">
 
-                🎵 全部歌曲
+  <div className="text-sm text-slate-400">
+    歌曲分類
+  </div>
 
-              </div>
+  <select
+    value={category}
+    onChange={(e) => setCategory(e.target.value)}
+    className="mt-3 w-full rounded-xl border border-slate-600 bg-slate-800 p-3 text-white"
+  >
+    {categories.map((item) => (
+      <option key={item.value} value={item.value}>
+        {item.label}
+      </option>
+    ))}
+  </select>
 
-              <div className="mt-1 text-xs text-slate-500">
-
-                （分類功能即將推出）
-
-              </div>
+</div>
 
             </div>
 

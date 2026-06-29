@@ -16,6 +16,8 @@ import Page from "../components/ui/Page";
 import Logo from "../components/ui/Logo";
 import Card from "../components/ui/Card";
 import Button from "../components/ui/Button";
+import { GAME_MODE_LABELS, CATEGORY_LABELS } from "../constants/gameMode";
+import { getRandomSong } from "../services/songService";
 
 export default function Lobby() {
   const navigate = useNavigate();
@@ -110,34 +112,9 @@ export default function Lobby() {
   const startGame = async () => {
   if (!roomDocId) return;
 
-  const songsSnapshot =
-    await getDocs(
-      collection(db, "songs")
-    );
+  const randomSong = await getRandomSong();
 
-  const songs = [];
-
-  songsSnapshot.forEach(
-    (docSnap) => {
-      songs.push({
-        id: docSnap.id,
-        ...docSnap.data()
-      });
-    }
-  );
-
-  if (songs.length === 0) {
-    alert("\u761d\ue609\u003f\u7507\uf5fb\ueb5a\u9788\uf2ea\u003f");
-    return;
-  }
-
-  const randomSong =
-    songs[
-      Math.floor(
-        Math.random() *
-          songs.length
-      )
-    ];
+if (!randomSong) return;
 
   const modes = [
     "songName",
@@ -230,8 +207,20 @@ export default function Lobby() {
               </div>
 
               <div className="mt-1 text-xl font-bold text-yellow-300">
-                {roomData?.gameMode || "等待中..."}
+                {GAME_MODE_LABELS[roomData?.gameMode] || "等待中..."}
               </div>
+
+<div className="rounded-2xl border border-violet-400/30 bg-violet-950/40 p-4">
+
+  <div className="text-sm text-slate-400">
+    歌曲分類
+  </div>
+
+  <div className="mt-1 text-xl font-bold text-yellow-300">
+    {CATEGORY_LABELS[roomData?.category] || "🎵 全部歌曲"}
+  </div>
+
+</div>
 
             </div>
 
