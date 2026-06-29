@@ -1,16 +1,204 @@
-# React + Vite
+# 🎵 金曲猜歌王 Golden Song King
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+<p align="center">
 
-Currently, two official plugins are available:
+多人即時連線猜歌遊戲（Realtime Multiplayer Music Quiz）
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+使用 React + Firebase Firestore 打造，支援手機與電腦瀏覽器。
 
-## React Compiler
+</p>
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+---
 
-## Expanding the ESLint configuration
+## 📸 遊戲畫面
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+> （完成後放上截圖）
+
+| 首頁 | 大廳 |
+|------|------|
+| Home Screenshot | Lobby Screenshot |
+
+| 遊戲 | 勝利畫面 |
+|------|---------|
+| Game Screenshot | Victory Screenshot |
+
+---
+
+# ✨ 特色功能
+
+## 🎮 多人即時連線
+
+- 建立房間
+- 玩家加入房間
+- 房主控制遊戲
+- Firebase 即時同步
+
+---
+
+## 🎵 猜歌玩法
+
+- 題目即時同步
+- 玩家同時作答
+- 公布答案
+- 即時計分
+- 最終排名
+
+---
+
+## ⏱️ 遊戲體驗
+
+- 倒數計時
+- 等待所有玩家作答
+- 勝利動畫
+- 最終排行榜
+- 響應式手機介面
+
+---
+
+## 🛠️ 開發工具
+
+內建 Developer Panel：
+
+- ➕ +1 分
+- 🏆 直接獲勝
+- 🎵 公布答案
+- ➡ 下一題
+- 🔄 重新開始
+
+方便測試所有遊戲流程。
+
+---
+
+# 🖥️ 技術架構
+
+| 技術 | 說明 |
+|------|------|
+| React 19 | UI Framework |
+| Vite | Build Tool |
+| Firebase Firestore | Realtime Database |
+| Tailwind CSS | UI Design |
+| React Router | Routing |
+
+---
+
+# 🚀 快速開始
+
+安裝
+
+```bash
+npm install
+```
+
+啟動
+
+```bash
+npm run dev
+```
+
+開啟：
+
+```
+http://localhost:5173
+```
+
+---
+
+# 📁 專案結構
+
+```
+src/
+ ├── components/
+ ├── firebase/
+ ├── pages/
+ ├── theme/
+
+public/
+
+songs.json
+
+README.md
+CHANGELOG.md
+ROADMAP.md
+AGENTS.md
+```
+
+---
+
+# 🎯 Roadmap
+
+## ✅ Release 2.2 Stable
+
+- Home UI
+- Host UI
+- Join UI
+- Lobby UI
+- Game UI
+- Firebase 即時同步
+- 倒數計時
+- 勝利畫面
+- 排行榜
+- Developer Panel
+
+---
+
+## 🚀 Release 2.3（規劃中）
+
+- 題庫分類
+- 題庫管理
+- 匯入題庫
+- 更多歌曲資料
+
+---
+
+## 🚀 Release 2.4（規劃中）
+
+- 歌詞模式
+- 音效
+- 排行榜動畫
+- 更多遊戲模式
+
+---
+
+## 🚀 Release 3.0（規劃中）
+
+- Spotify 整合
+- PWA
+- 玩家統計
+- 成就系統
+- 活動模式
+
+---
+
+# 📝 CHANGELOG
+
+請參閱：
+
+CHANGELOG.md
+
+---
+
+# 🐞 Bug Tracking
+
+請參閱：
+
+bugs.md
+
+---
+
+# 📄 License
+
+MIT License
+
+---
+
+# ❤️ 作者
+
+曾建鈞
+
+GitHub
+
+https://github.com/utalul
+
+---
+
+⭐ 如果你喜歡這個專案，歡迎給一個 Star！
