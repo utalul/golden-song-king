@@ -31,10 +31,15 @@ export default function SongEditor({ song }) {
           </label>
 
           <input
-            value={editingSong.songName}
-            readOnly
-            className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2"
-          />
+  value={editingSong.songName}
+  onChange={(e) =>
+    setEditingSong({
+      ...editingSong,
+      songName: e.target.value,
+    })
+  }
+  className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2"
+/>
         </div>
 
         <div>
@@ -43,10 +48,15 @@ export default function SongEditor({ song }) {
           </label>
 
           <input
-            value={editingSong.artist}
-            readOnly
-            className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2"
-          />
+  value={editingSong.artist}
+  onChange={(e) =>
+    setEditingSong({
+      ...editingSong,
+      artist: e.target.value,
+    })
+  }
+  className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2"
+/>
         </div>
 
         <div>
@@ -55,10 +65,15 @@ export default function SongEditor({ song }) {
           </label>
 
           <select
-            value={editingSong.category}
-            disabled
-            className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2"
-          >
+  value={editingSong.category}
+  onChange={(e) =>
+    setEditingSong({
+      ...editingSong,
+      category: e.target.value,
+    })
+  }
+className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2"
+>
             <option value="mandarin">華語</option>
             <option value="taiwanese">台語</option>
             <option value="western">西洋</option>
@@ -74,7 +89,12 @@ export default function SongEditor({ song }) {
 
           <select
             value={editingSong.decade}
-            disabled
+            onChange={(e) =>
+  setEditingSong({
+    ...editingSong,
+    decade: e.target.value,
+  })
+}
             className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2"
           >
             <option value="1970">1970</option>
@@ -93,7 +113,12 @@ export default function SongEditor({ song }) {
 
           <select
             value={editingSong.difficulty}
-            disabled
+            onChange={(e) =>
+  setEditingSong({
+    ...editingSong,
+    difficulty: Number(e.target.value),
+  })
+}
             className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2"
           >
             <option value={1}>1</option>
