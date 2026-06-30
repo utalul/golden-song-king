@@ -1,7 +1,9 @@
 import songs from "../../data/songs/all.json";
 
 export default function SongTable({
-  keyword = ""
+  keyword = "",
+  selectedSong,
+  onSelectSong
 }) {
 const filteredSongs = songs.filter((song) => {
   const text = `${song.songName}${song.artist}`.toLowerCase();
@@ -38,9 +40,20 @@ return (
         <tbody className="divide-y divide-slate-700 bg-slate-900">
   {filteredSongs.map((song, index) => (
     <tr
-      key={index}
-      className="hover:bg-slate-800 transition-colors"
-    >
+  key={index}
+  onClick={() => onSelectSong(song)}
+  className={`
+    cursor-pointer
+    transition-colors
+    hover:bg-slate-800
+    ${
+      selectedSong?.songName === song.songName &&
+      selectedSong?.artist === song.artist
+        ? "bg-slate-700"
+        : ""
+    }
+  `}
+>
       <td className="px-4 py-3">
         {song.songName}
       </td>
