@@ -1,6 +1,5 @@
-import songs from "../../data/songs/all.json";
-
 export default function SongTable({
+  songs,
   keyword = "",
   selectedSong,
   onSelectSong
