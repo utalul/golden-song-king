@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
 import Button from "../ui/Button";
 
-export default function SongEditor({ song }) {
+export default function SongEditor({
+  song,
+  onSave
+}) {
   const [editingSong, setEditingSong] = useState(null);
 
   useEffect(() => {
@@ -128,11 +131,11 @@ className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2"
         </div>
 
         <Button
-          disabled
-          className="mt-6 w-full"
-        >
-          💾 儲存（開發中）
-        </Button>
+  className="mt-6 w-full"
+  onClick={() => onSave(editingSong)}
+>
+  💾 儲存
+</Button>
 
       </div>
     </div>

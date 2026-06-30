@@ -1,4 +1,5 @@
 import { useState } from "react";
+import songsData from "../data/songs/all.json";
 import Button from "../components/ui/Button";
 import SearchBar from "../components/admin/SearchBar";
 import SongTable from "../components/admin/SongTable";
@@ -10,7 +11,23 @@ export default function Admin() {
     useState("");
 const [selectedSong, setSelectedSong] =
   useState(null);
+const [songs, setSongs] = useState(songsData);
+const handleSave = (updatedSong) => {
+  setSongs(
+    songs.map((song) => {
+      if (
+        song.songName === selectedSong.songName &&
+        song.artist === selectedSong.artist
+      ) {
+        return updatedSong;
+      }
 
+      return song;
+    })
+  );
+
+  setSelectedSong(updatedSong);
+};
   return (
     <div>
 
@@ -28,16 +45,18 @@ const [selectedSong, setSelectedSong] =
     />
 
     <SongTable
-      keyword={keyword}
-      selectedSong={selectedSong}
-      onSelectSong={setSelectedSong}
-    />
+  songs={songs}
+  keyword={keyword}
+  selectedSong={selectedSong}
+  onSelectSong={setSelectedSong}
+/>
 
   </div>
 
   <SongEditor
-    song={selectedSong}
-  />
+  song={selectedSong}
+  onSave={handleSave}
+/>
 
 </div>
 
