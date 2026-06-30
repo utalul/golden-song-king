@@ -1,56 +1,402 @@
 [
-  {"songName":"月亮代表我的心","artist":"鄧麗君","decade":"1970","spotifyId":"","difficulty":1},
-  {"songName":"甜蜜蜜","artist":"鄧麗君","decade":"1970","spotifyId":"","difficulty":1},
-  {"songName":"小城故事","artist":"鄧麗君","decade":"1970","spotifyId":"","difficulty":1},
-  {"songName":"橄欖樹","artist":"齊豫","decade":"1970","spotifyId":"","difficulty":2},
-  {"songName":"龍的傳人","artist":"李建復","decade":"1970","spotifyId":"","difficulty":2},
-
-  {"songName":"童年","artist":"羅大佑","decade":"1980","spotifyId":"","difficulty":1},
-  {"songName":"戀曲1980","artist":"羅大佑","decade":"1980","spotifyId":"","difficulty":2},
-  {"songName":"戀曲1990","artist":"羅大佑","decade":"1980","spotifyId":"","difficulty":1},
-  {"songName":"是否","artist":"蘇芮","decade":"1980","spotifyId":"","difficulty":2},
-  {"songName":"酒矸倘賣無","artist":"蘇芮","decade":"1980","spotifyId":"","difficulty":2},
-
-  {"songName":"吻別","artist":"張學友","decade":"1990","spotifyId":"","difficulty":1},
-  {"songName":"一路上有你","artist":"張學友","decade":"1990","spotifyId":"","difficulty":1},
-  {"songName":"朋友","artist":"周華健","decade":"1990","spotifyId":"","difficulty":1},
-  {"songName":"花心","artist":"周華健","decade":"1990","spotifyId":"","difficulty":1},
-  {"songName":"愛如潮水","artist":"張信哲","decade":"1990","spotifyId":"","difficulty":1},
-  {"songName":"過火","artist":"張信哲","decade":"1990","spotifyId":"","difficulty":2},
-  {"songName":"心太軟","artist":"任賢齊","decade":"1990","spotifyId":"","difficulty":1},
-  {"songName":"傷心太平洋","artist":"任賢齊","decade":"1990","spotifyId":"","difficulty":1},
-  {"songName":"對面的女孩看過來","artist":"任賢齊","decade":"1990","spotifyId":"","difficulty":1},
-  {"songName":"至少還有你","artist":"林憶蓮","decade":"1990","spotifyId":"","difficulty":1},
-  {"songName":"聽海","artist":"張惠妹","decade":"1990","spotifyId":"","difficulty":1},
-  {"songName":"姐妹","artist":"張惠妹","decade":"1990","spotifyId":"","difficulty":1},
-  {"songName":"新不了情","artist":"萬芳","decade":"1990","spotifyId":"","difficulty":1},
-  {"songName":"勇氣","artist":"梁靜茹","decade":"1990","spotifyId":"","difficulty":1},
-  {"songName":"後來","artist":"劉若英","decade":"1990","spotifyId":"","difficulty":1},
-
-  {"songName":"七里香","artist":"周杰倫","decade":"2000","spotifyId":"","difficulty":1},
-  {"songName":"青花瓷","artist":"周杰倫","decade":"2000","spotifyId":"","difficulty":1},
-  {"songName":"簡單愛","artist":"周杰倫","decade":"2000","spotifyId":"","difficulty":1},
-  {"songName":"晴天","artist":"周杰倫","decade":"2000","spotifyId":"","difficulty":1},
-  {"songName":"夜曲","artist":"周杰倫","decade":"2000","spotifyId":"","difficulty":2},
-  {"songName":"童話","artist":"光良","decade":"2000","spotifyId":"","difficulty":1},
-  {"songName":"第一次","artist":"光良","decade":"2000","spotifyId":"","difficulty":1},
-  {"songName":"江南","artist":"林俊傑","decade":"2000","spotifyId":"","difficulty":1},
-  {"songName":"曹操","artist":"林俊傑","decade":"2000","spotifyId":"","difficulty":2},
-  {"songName":"一千年以後","artist":"林俊傑","decade":"2000","spotifyId":"","difficulty":1},
-  {"songName":"愛你","artist":"王心凌","decade":"2000","spotifyId":"","difficulty":1},
-  {"songName":"倒帶","artist":"蔡依林","decade":"2000","spotifyId":"","difficulty":1},
-  {"songName":"舞孃","artist":"蔡依林","decade":"2000","spotifyId":"","difficulty":2},
-  {"songName":"Super Star","artist":"S.H.E","decade":"2000","spotifyId":"","difficulty":1},
-  {"songName":"波斯貓","artist":"S.H.E","decade":"2000","spotifyId":"","difficulty":1},
-
-  {"songName":"小幸運","artist":"田馥甄","decade":"2010","spotifyId":"","difficulty":1},
-  {"songName":"那些年","artist":"胡夏","decade":"2010","spotifyId":"","difficulty":1},
-  {"songName":"告白氣球","artist":"周杰倫","decade":"2010","spotifyId":"","difficulty":1},
-  {"songName":"不為誰而作的歌","artist":"林俊傑","decade":"2010","spotifyId":"","difficulty":2},
-  {"songName":"光年之外","artist":"鄧紫棋","decade":"2010","spotifyId":"","difficulty":1},
-  {"songName":"泡沫","artist":"鄧紫棋","decade":"2010","spotifyId":"","difficulty":1},
-  {"songName":"魚仔","artist":"盧廣仲","decade":"2010","spotifyId":"","difficulty":2},
-  {"songName":"刻在我心底的名字","artist":"盧廣仲","decade":"2020","spotifyId":"","difficulty":1},
-  {"songName":"怎麼了","artist":"周興哲","decade":"2020","spotifyId":"","difficulty":1},
-  {"songName":"如果可以","artist":"韋禮安","decade":"2020","spotifyId":"","difficulty":1}
+  {
+    "songName": "月亮代表我的心",
+    "artist": "鄧麗君",
+    "category": "mandarin",
+    "decade": "1970",
+    "spotifyId": "",
+    "difficulty": 1
+  },
+  {
+    "songName": "甜蜜蜜",
+    "artist": "鄧麗君",
+    "category": "mandarin",
+    "decade": "1970",
+    "spotifyId": "",
+    "difficulty": 1
+  },
+  {
+    "songName": "小城故事",
+    "artist": "鄧麗君",
+    "category": "mandarin",
+    "decade": "1970",
+    "spotifyId": "",
+    "difficulty": 1
+  },
+  {
+    "songName": "橄欖樹",
+    "artist": "齊豫",
+    "category": "mandarin",
+    "decade": "1970",
+    "spotifyId": "",
+    "difficulty": 2
+  },
+  {
+    "songName": "龍的傳人",
+    "artist": "李建復",
+    "category": "mandarin",
+    "decade": "1970",
+    "spotifyId": "",
+    "difficulty": 2
+  },
+  {
+    "songName": "童年",
+    "artist": "羅大佑",
+    "category": "mandarin",
+    "decade": "1980",
+    "spotifyId": "",
+    "difficulty": 1
+  },
+  {
+    "songName": "戀曲1980",
+    "artist": "羅大佑",
+    "category": "mandarin",
+    "decade": "1980",
+    "spotifyId": "",
+    "difficulty": 2
+  },
+  {
+    "songName": "戀曲1990",
+    "artist": "羅大佑",
+    "category": "mandarin",
+    "decade": "1980",
+    "spotifyId": "",
+    "difficulty": 1
+  },
+  {
+    "songName": "是否",
+    "artist": "蘇芮",
+    "category": "mandarin",
+    "decade": "1980",
+    "spotifyId": "",
+    "difficulty": 2
+  },
+  {
+    "songName": "酒矸倘賣無",
+    "artist": "蘇芮",
+    "category": "mandarin",
+    "decade": "1980",
+    "spotifyId": "",
+    "difficulty": 2
+  },
+  {
+    "songName": "吻別",
+    "artist": "張學友",
+    "category": "mandarin",
+    "decade": "1990",
+    "spotifyId": "",
+    "difficulty": 1
+  },
+  {
+    "songName": "一路上有你",
+    "artist": "張學友",
+    "category": "mandarin",
+    "decade": "1990",
+    "spotifyId": "",
+    "difficulty": 1
+  },
+  {
+    "songName": "朋友",
+    "artist": "周華健",
+    "category": "mandarin",
+    "decade": "1990",
+    "spotifyId": "",
+    "difficulty": 1
+  },
+  {
+    "songName": "花心",
+    "artist": "周華健",
+    "category": "mandarin",
+    "decade": "1990",
+    "spotifyId": "",
+    "difficulty": 1
+  },
+  {
+    "songName": "愛如潮水",
+    "artist": "張信哲",
+    "category": "mandarin",
+    "decade": "1990",
+    "spotifyId": "",
+    "difficulty": 1
+  },
+  {
+    "songName": "過火",
+    "artist": "張信哲",
+    "category": "mandarin",
+    "decade": "1990",
+    "spotifyId": "",
+    "difficulty": 2
+  },
+  {
+    "songName": "心太軟",
+    "artist": "任賢齊",
+    "category": "mandarin",
+    "decade": "1990",
+    "spotifyId": "",
+    "difficulty": 1
+  },
+  {
+    "songName": "傷心太平洋",
+    "artist": "任賢齊",
+    "category": "mandarin",
+    "decade": "1990",
+    "spotifyId": "",
+    "difficulty": 1
+  },
+  {
+    "songName": "對面的女孩看過來",
+    "artist": "任賢齊",
+    "category": "mandarin",
+    "decade": "1990",
+    "spotifyId": "",
+    "difficulty": 1
+  },
+  {
+    "songName": "至少還有你",
+    "artist": "林憶蓮",
+    "category": "mandarin",
+    "decade": "1990",
+    "spotifyId": "",
+    "difficulty": 1
+  },
+  {
+    "songName": "聽海",
+    "artist": "張惠妹",
+    "category": "mandarin",
+    "decade": "1990",
+    "spotifyId": "",
+    "difficulty": 1
+  },
+  {
+    "songName": "姐妹",
+    "artist": "張惠妹",
+    "category": "mandarin",
+    "decade": "1990",
+    "spotifyId": "",
+    "difficulty": 1
+  },
+  {
+    "songName": "新不了情",
+    "artist": "萬芳",
+    "category": "mandarin",
+    "decade": "1990",
+    "spotifyId": "",
+    "difficulty": 1
+  },
+  {
+    "songName": "勇氣",
+    "artist": "梁靜茹",
+    "category": "mandarin",
+    "decade": "1990",
+    "spotifyId": "",
+    "difficulty": 1
+  },
+  {
+    "songName": "後來",
+    "artist": "劉若英",
+    "category": "mandarin",
+    "decade": "1990",
+    "spotifyId": "",
+    "difficulty": 1
+  },
+  {
+    "songName": "七里香",
+    "artist": "周杰倫",
+    "category": "mandarin",
+    "decade": "2000",
+    "spotifyId": "",
+    "difficulty": 1
+  },
+  {
+    "songName": "青花瓷",
+    "artist": "周杰倫",
+    "category": "mandarin",
+    "decade": "2000",
+    "spotifyId": "",
+    "difficulty": 1
+  },
+  {
+    "songName": "簡單愛",
+    "artist": "周杰倫",
+    "category": "mandarin",
+    "decade": "2000",
+    "spotifyId": "",
+    "difficulty": 1
+  },
+  {
+    "songName": "晴天",
+    "artist": "周杰倫",
+    "category": "mandarin",
+    "decade": "2000",
+    "spotifyId": "",
+    "difficulty": 1
+  },
+  {
+    "songName": "夜曲",
+    "artist": "周杰倫",
+    "category": "mandarin",
+    "decade": "2000",
+    "spotifyId": "",
+    "difficulty": 2
+  },
+  {
+    "songName": "童話",
+    "artist": "光良",
+    "category": "mandarin",
+    "decade": "2000",
+    "spotifyId": "",
+    "difficulty": 1
+  },
+  {
+    "songName": "第一次",
+    "artist": "光良",
+    "category": "mandarin",
+    "decade": "2000",
+    "spotifyId": "",
+    "difficulty": 1
+  },
+  {
+    "songName": "江南",
+    "artist": "林俊傑",
+    "category": "mandarin",
+    "decade": "2000",
+    "spotifyId": "",
+    "difficulty": 1
+  },
+  {
+    "songName": "曹操",
+    "artist": "林俊傑",
+    "category": "mandarin",
+    "decade": "2000",
+    "spotifyId": "",
+    "difficulty": 2
+  },
+  {
+    "songName": "一千年以後",
+    "artist": "林俊傑",
+    "category": "mandarin",
+    "decade": "2000",
+    "spotifyId": "",
+    "difficulty": 1
+  },
+  {
+    "songName": "愛你",
+    "artist": "王心凌",
+    "category": "mandarin",
+    "decade": "2000",
+    "spotifyId": "",
+    "difficulty": 1
+  },
+  {
+    "songName": "倒帶",
+    "artist": "蔡依林",
+    "category": "mandarin",
+    "decade": "2000",
+    "spotifyId": "",
+    "difficulty": 1
+  },
+  {
+    "songName": "舞孃",
+    "artist": "蔡依林",
+    "category": "mandarin",
+    "decade": "2000",
+    "spotifyId": "",
+    "difficulty": 2
+  },
+  {
+    "songName": "Super Star",
+    "artist": "S.H.E",
+    "category": "mandarin",
+    "decade": "2000",
+    "spotifyId": "",
+    "difficulty": 1
+  },
+  {
+    "songName": "波斯貓",
+    "artist": "S.H.E",
+    "category": "mandarin",
+    "decade": "2000",
+    "spotifyId": "",
+    "difficulty": 1
+  },
+  {
+    "songName": "小幸運",
+    "artist": "田馥甄",
+    "category": "mandarin",
+    "decade": "2010",
+    "spotifyId": "",
+    "difficulty": 1
+  },
+  {
+    "songName": "那些年",
+    "artist": "胡夏",
+    "category": "mandarin",
+    "decade": "2010",
+    "spotifyId": "",
+    "difficulty": 1
+  },
+  {
+    "songName": "告白氣球",
+    "artist": "周杰倫",
+    "category": "mandarin",
+    "decade": "2010",
+    "spotifyId": "",
+    "difficulty": 1
+  },
+  {
+    "songName": "不為誰而作的歌",
+    "artist": "林俊傑",
+    "category": "mandarin",
+    "decade": "2010",
+    "spotifyId": "",
+    "difficulty": 2
+  },
+  {
+    "songName": "光年之外",
+    "artist": "鄧紫棋",
+    "category": "mandarin",
+    "decade": "2010",
+    "spotifyId": "",
+    "difficulty": 1
+  },
+  {
+    "songName": "泡沫",
+    "artist": "鄧紫棋",
+    "category": "mandarin",
+    "decade": "2010",
+    "spotifyId": "",
+    "difficulty": 1
+  },
+  {
+    "songName": "魚仔",
+    "artist": "盧廣仲",
+    "category": "mandarin",
+    "decade": "2010",
+    "spotifyId": "",
+    "difficulty": 2
+  },
+  {
+    "songName": "刻在我心底的名字",
+    "artist": "盧廣仲",
+    "category": "mandarin",
+    "decade": "2020",
+    "spotifyId": "",
+    "difficulty": 1
+  },
+  {
+    "songName": "怎麼了",
+    "artist": "周興哲",
+    "category": "mandarin",
+    "decade": "2020",
+    "spotifyId": "",
+    "difficulty": 1
+  },
+  {
+    "songName": "如果可以",
+    "artist": "韋禮安",
+    "category": "mandarin",
+    "decade": "2020",
+    "spotifyId": "",
+    "difficulty": 1
+  }
 ]
