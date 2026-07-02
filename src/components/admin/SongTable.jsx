@@ -2,7 +2,8 @@ export default function SongTable({
   songs,
   keyword = "",
   selectedSong,
-  onSelectSong
+  onSelectSong,
+  onDeleteSong
 }) {
 const filteredSongs = songs.filter((song) => {
   const text = `${song.songName}${song.artist}`.toLowerCase();
@@ -33,6 +34,10 @@ return (
             <th className="px-4 py-3 text-center text-sm font-semibold text-white">
               難度
             </th>
+
+<th className="px-4 py-3 text-center text-sm font-semibold text-white">
+  操作
+</th>
           </tr>
         </thead>
 
@@ -72,6 +77,19 @@ return (
       <td className="px-4 py-3 text-center">
         {song.difficulty}
       </td>
+
+<td className="px-4 py-3 text-center">
+  <button
+  className="rounded bg-red-600 px-3 py-1 text-sm text-white hover:bg-red-700"
+  onClick={(e) => {
+    e.stopPropagation();
+    onDeleteSong(song);
+  }}
+>
+  🗑 刪除
+</button>
+</td>
+
     </tr>
   ))}
 </tbody>
