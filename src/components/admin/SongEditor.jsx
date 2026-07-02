@@ -5,7 +5,12 @@ export default function SongEditor({
   song,
   onSave
 }) {
-  const [editingSong, setEditingSong] = useState(null);
+  const [editingSong, setEditingSong] =
+  useState(null);
+
+const isDirty =
+  JSON.stringify(editingSong) !==
+  JSON.stringify(song);
 
   useEffect(() => {
     setEditingSong(song);
@@ -130,12 +135,27 @@ className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2"
           </select>
         </div>
 
-        <Button
-  className="mt-6 w-full"
-  onClick={() => onSave(editingSong)}
+        <div className="mt-6 flex gap-3">
+
+  <Button
+  className="flex-1"
+  onClick={() => {
+    onSave(editingSong);
+    setEditingSong(editingSong);
+  }}
+  disabled={!isDirty}
 >
   💾 儲存
 </Button>
+
+  <Button
+    className="flex-1"
+    onClick={() => setEditingSong(song)}
+  >
+    ↩ 取消
+  </Button>
+
+</div>
 
       </div>
     </div>
