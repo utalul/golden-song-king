@@ -11,6 +11,7 @@ import Lobby from "./pages/Lobby";
 import Game from "./pages/Game";
 import ImportSongs from "./pages/ImportSongs";
 import Admin from "./pages/Admin";
+import AudioTest from "./pages/AudioTest";
 
 function App() {
   return (
@@ -44,11 +45,18 @@ function App() {
   path="/import"
   element={<ImportSongs />}
 />
+
 <Route
   path="/admin"
   element={<Admin />}
 />
-      </Routes>
+
+<Route
+  path="/audio-test"
+  element={<AudioTest />}
+/>
+
+</Routes>
     </BrowserRouter>
   );
 }
