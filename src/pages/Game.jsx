@@ -32,6 +32,9 @@ import LoadingCard from "../components/game/LoadingCard";
 import { DEV_MODE, QUESTION_TIME } from "../constants/game";
 import useQuestionCountdown from "../hooks/useQuestionCountdown";
 import { getRandomSong } from "../services/songService";
+import AudioPlayer from "../components/game/AudioPlayer";
+import { getAudioUrl } from "../services/audioService";
+import { SONG_COLLECTION } from "../config/gameConfig";
 
 export default function Game() {
   const roomId =
@@ -99,10 +102,10 @@ export default function Game() {
                 room.currentSongId
               ) {
                 const songRef = doc(
-                  db,
-                  "songs",
-                  room.currentSongId
-                );
+  db,
+  SONG_COLLECTION,
+  room.currentSongId
+);
 
                 const songSnap =
                   await getDoc(
@@ -343,6 +346,8 @@ const submitAnswer =
 };
 
 const nextQuestion = async () => {
+
+console.log("nextQuestion 被呼叫");
 
   if (!roomDocId)
     return;
@@ -653,6 +658,10 @@ const developerPanel = (
           modeText={modeText}
           playerName={playerName}
         />
+
+<AudioPlayer
+    url={getAudioUrl(song)}
+/>
 
         <CountdownCard
           timeLeft={timeLeft}

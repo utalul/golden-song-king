@@ -6,7 +6,8 @@
   "category": "mandarin",
   "decade": "1970",
   "difficulty": 1,
-  "spotifyId": ""
+  "spotifyId": "",
+  "previewUrl": "/audio/test.mp3"
 },
   {
     "songName": "甜蜜蜜",

@@ -1,8 +1,11 @@
 import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
+import {
+  getFirestore,
+  connectFirestoreEmulator
+} from "firebase/firestore";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyBtKXv7Aof0GIPlsp5VaE-W65MMxZOWerU",
+  apiKey: "...",
   authDomain: "golden-song-king.firebaseapp.com",
   projectId: "golden-song-king",
   storageBucket: "golden-song-king.firebasestorage.app",
@@ -12,4 +15,9 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 
+console.log("App options =", app.options);
+
 export const db = getFirestore(app);
+
+// 如果有這一行，先註解掉
+// connectFirestoreEmulator(...)
