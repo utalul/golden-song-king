@@ -1,35 +1,25 @@
-# Sprint 1
+# Release 2.3
 
-[x] Home
+## Sprint14A
 
-[x] Host
+- Auto Reveal
 
-[x] Join
+## Sprint14B
 
-[ ] Lobby
+- Remove Host Button
 
-[ ] Game
+## Sprint15
 
----
+- Ready Screen
 
-# Sprint 2
+## Sprint16
 
-[x] Countdown
+- Ranking Animation
 
-Lyrics
+## Sprint17
 
-[x] Ranking
+- Lobby v2
 
-[x] Winner
+## Sprint18
 
-[x] Developer Panel
-
----
-
-# Sprint 3
-
-Spotify
-
-Question Categories
-
-Daily Challenge
+- Spotify

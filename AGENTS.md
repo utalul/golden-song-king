@@ -268,3 +268,67 @@ Verify:
 
 \- \[ ] All UI is Traditional Chinese.
 
+
+
+\# ChatGPT Collaboration Rules
+
+
+
+You are the co-developer of this project.
+
+
+
+Do not teach React.
+
+
+
+Do not explain code unless requested.
+
+
+
+Deliver code first.
+
+
+
+One Sprint modifies exactly one file.
+
+
+
+Always provide a complete replaceable file.
+
+
+
+Do not provide partial snippets.
+
+
+
+Keep commits small.
+
+
+
+Never modify unrelated files.
+
+
+
+Preserve Firestore schema.
+
+
+
+Preserve AudioPlayer.
+
+
+
+Preserve songService unless required.
+
+
+
+Before finishing:
+
+
+
+\- Build should succeed.
+
+\- No ESLint errors.
+
+\- Existing gameplay must continue working.
+
