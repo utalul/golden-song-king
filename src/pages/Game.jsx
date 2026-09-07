@@ -12,6 +12,7 @@ import {
   onSnapshot,
   doc,
   getDoc,
+  getDocs,
   updateDoc,
   increment
 } from "firebase/firestore";
@@ -34,13 +35,60 @@ import WinnerDialog from "../components/game/WinnerDialog";
 import DeveloperPanel from "../components/game/DeveloperPanel";
 import HostControlCard from "../components/game/HostControlCard";
 import LoadingCard from "../components/game/LoadingCard";
-import { DEV_MODE, QUESTION_TIME } from "../constants/game";
-import { getRandomSong } from "../services/songService";
 import AudioPlayer from "../components/game/AudioPlayer";
-import { getAudioUrl } from "../services/audioService";
-import { SONG_COLLECTION } from "../config/gameConfig";
+import { DEV_MODE } from "../constants/game";
+import { GAME_PHASES } from "../constants/gamePhases";
+import {
+  GAME_CONFIG,
+  SONG_COLLECTION
+} from "../config/gameConfig";
 
-const READY_TIME = 3;
+const MODES = [
+  "songName",
+  "artist"
+];
+
+const REVEAL_TIME = 5;
+
+function shuffleSongs(songs) {
+  const shuffledSongs = [...songs];
+
+  for (let index = shuffledSongs.length - 1; index > 0; index -= 1) {
+    const randomIndex = Math.floor(
+      Math.random() * (index + 1)
+    );
+
+    [
+      shuffledSongs[index],
+      shuffledSongs[randomIndex]
+    ] = [
+      shuffledSongs[randomIndex],
+      shuffledSongs[index]
+    ];
+  }
+
+  return shuffledSongs;
+}
+
+function getRandomMode() {
+  return MODES[
+    Math.floor(
+      Math.random() * MODES.length
+    )
+  ];
+}
+
+function getPhaseTime(gamePhase) {
+  if (gamePhase === GAME_PHASES.ANSWERING) {
+    return GAME_CONFIG.ANSWER_TIME;
+  }
+
+  if (gamePhase === GAME_PHASES.REVEAL) {
+    return REVEAL_TIME;
+  }
+
+  return GAME_CONFIG.PLAY_TIME;
+}
 
 export default function Game() {
   const roomId =
@@ -52,26 +100,23 @@ export default function Game() {
   const isHost =
     localStorage.getItem("isHost") === "true";
 
-  const autoRevealTriggeredRef =
-    useRef(false);
-
   const nextQuestionTimerRef =
     useRef(null);
 
-  const activeQuestionKeyRef =
+  const nextQuestionRef =
+    useRef(null);
+
+  const revealTimeoutKeyRef =
     useRef("");
 
-  const questionLiveRef =
+  const queueInitRef =
     useRef(false);
 
-  const debugStateRef =
-    useRef({
-      currentQuestion: null,
-      timeLeft: null,
-      ready: false,
-      answerRevealed: false,
-      answersLength: 0
-    });
+  const phaseAdvanceRef =
+    useRef("");
+
+  const timerPhaseKeyRef =
+    useRef("");
 
   const [answer, setAnswer] =
     useState("");
@@ -94,32 +139,29 @@ export default function Game() {
   const [song, setSong] =
     useState(null);
 
-  const [readyLeft, setReadyLeft] =
-    useState(READY_TIME);
-
-  const [questionStarted, setQuestionStarted] =
-    useState(false);
-
-  const [countdownReady, setCountdownReady] =
-    useState(false);
-
   const [timeLeft, setTimeLeft] =
-    useState(QUESTION_TIME);
+    useState(GAME_CONFIG.PLAY_TIME);
+
+  const gamePhase =
+    roomData?.gamePhase ||
+    GAME_PHASES.PLAYING;
+
+  const isPlayingPhase =
+    gamePhase === GAME_PHASES.PLAYING;
+
+  const isAnsweringPhase =
+    gamePhase === GAME_PHASES.ANSWERING;
+
+  const isRevealPhase =
+    gamePhase === GAME_PHASES.REVEAL;
 
   const questionKey =
     roomData
       ? `${roomData.gameRound}-${roomData.currentQuestion}-${roomData.currentSongId}`
       : "";
 
-  const isReady =
-    !questionStarted &&
-    readyLeft > 0 &&
-    !roomData?.answerRevealed &&
-    !roomData?.winner;
-
-  const resetCountdown = useCallback(() => {
-    setTimeLeft(QUESTION_TIME);
-  }, []);
+  const phaseKey =
+    `${questionKey}-${gamePhase}`;
 
   const currentAnswers =
     roomData
@@ -137,56 +179,69 @@ export default function Game() {
     currentAnswers.length >= players.length;
 
   const timeExpired =
-    questionStarted &&
-    countdownReady &&
     timeLeft <= 0;
 
-  const logDebugEvent = useCallback((eventName, data = {}) => {
-    console.log(
-      `[Game Debug] ${eventName}`,
-      {
-        ...debugStateRef.current,
-        ...data
-      }
+  const resetPhaseTimer = useCallback((phase) => {
+    setTimeLeft(
+      getPhaseTime(phase)
     );
   }, []);
 
-  useEffect(() => {
-    debugStateRef.current = {
-      currentQuestion:
-        roomData?.currentQuestion ?? null,
-      timeLeft,
-      ready: isReady,
-      answerRevealed:
-        roomData?.answerRevealed ?? false,
-      answersLength:
-        answers.length
+  const fetchSongQueue = useCallback(async () => {
+    const songsRef =
+      collection(db, SONG_COLLECTION);
+
+    const snapshot =
+      DEV_MODE
+        ? await getDocs(
+            query(
+              songsRef,
+              where("isTest", "==", true)
+            )
+          )
+        : await getDocs(songsRef);
+
+    const songs = [];
+
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data();
+
+      if (
+        !DEV_MODE &&
+        data.isTest === true
+      ) {
+        return;
+      }
+
+      songs.push({
+        id: docSnap.id,
+        ...data
+      });
+    });
+
+    return shuffleSongs(songs);
+  }, []);
+
+  const createQuestionState = useCallback((songQueue) => {
+    const nextSong =
+      songQueue.shift();
+
+    if (!nextSong) {
+      return null;
+    }
+
+    return {
+      currentSongId: nextSong.id,
+      currentMode: getRandomMode(),
+      songQueue: songQueue.map(
+        (queueSong) => queueSong.id
+      ),
+      gamePhase: GAME_PHASES.PLAYING,
+      phaseStartedAt: Date.now(),
+      answerRevealed: false,
+      scored: false
     };
-  }, [
-    answers.length,
-    isReady,
-    roomData?.answerRevealed,
-    roomData?.currentQuestion,
-    timeLeft
-  ]);
-
-  useEffect(() => {
-    logDebugEvent(
-      "timeLeft 變化"
-    );
-  }, [
-    logDebugEvent,
-    timeLeft
-  ]);
-
-  useEffect(() => {
-    logDebugEvent(
-      "answerRevealed 更新"
-    );
-  }, [
-    logDebugEvent,
-    roomData?.answerRevealed
-  ]);
+  }, []);
 
   useEffect(() => {
     if (!roomId) return;
@@ -234,6 +289,8 @@ export default function Game() {
                     ...songSnap.data()
                   });
                 }
+              } else {
+                setSong(null);
               }
             }
           );
@@ -269,6 +326,64 @@ export default function Game() {
       unsubscribePlayers();
     };
   }, [roomId]);
+
+  useEffect(() => {
+    if (!isHost)
+      return;
+
+    if (!roomDocId)
+      return;
+
+    if (!roomData)
+      return;
+
+    if (roomData.status !== "playing")
+      return;
+
+    if (
+      Array.isArray(roomData.songQueue) &&
+      roomData.gamePhase
+    ) {
+      return;
+    }
+
+    if (queueInitRef.current)
+      return;
+
+    queueInitRef.current = true;
+
+    async function initializeSongQueue() {
+      const songQueue =
+        await fetchSongQueue();
+
+      const questionState =
+        createQuestionState(songQueue);
+
+      if (!questionState)
+        return;
+
+      await updateDoc(
+        doc(
+          db,
+          "rooms",
+          roomDocId
+        ),
+        {
+          ...questionState,
+          currentQuestion:
+            roomData.currentQuestion || 1
+        }
+      );
+    }
+
+    initializeSongQueue();
+  }, [
+    createQuestionState,
+    fetchSongQueue,
+    isHost,
+    roomData,
+    roomDocId
+  ]);
 
   useEffect(() => {
     if (!roomData) return;
@@ -323,104 +438,41 @@ export default function Game() {
 
   useEffect(() => {
     /* eslint-disable react-hooks/set-state-in-effect */
-    activeQuestionKeyRef.current = questionKey;
-
-    questionLiveRef.current = false;
-
     setSubmitted(false);
-
     setAnswer("");
-
     setAnswers([]);
-
-    setReadyLeft(READY_TIME);
-
-    setQuestionStarted(false);
-
-    setCountdownReady(false);
-
-    resetCountdown();
-
-    logDebugEvent(
-      "QUESTION_TIME reset"
-    );
-
-    logDebugEvent(
-      "Ready 開始",
-      {
-        currentQuestion:
-          roomData?.currentQuestion ?? null,
-        ready: true
-      }
-    );
+    phaseAdvanceRef.current = "";
+    timerPhaseKeyRef.current = "";
+    revealTimeoutKeyRef.current = "";
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [
-    logDebugEvent,
-    questionKey,
-    roomData?.currentQuestion,
-    resetCountdown
+    questionKey
   ]);
 
   useEffect(() => {
-    autoRevealTriggeredRef.current = false;
+    /* eslint-disable react-hooks/set-state-in-effect */
+    timerPhaseKeyRef.current = "";
+    resetPhaseTimer(gamePhase);
+    /* eslint-enable react-hooks/set-state-in-effect */
   }, [
-    roomData?.gameRound,
-    roomData?.currentQuestion,
-    roomData?.currentSongId
+    gamePhase,
+    phaseKey,
+    resetPhaseTimer
   ]);
 
   useEffect(() => {
-    if (!roomData)
+    if (timeLeft !== getPhaseTime(gamePhase))
       return;
 
-    if (roomData.answerRevealed)
-      return;
-
-    if (roomData.winner)
-      return;
-
-    if (readyLeft <= 0)
-      return;
-
-    const timer = window.setTimeout(
-      () => {
-        if (readyLeft <= 1) {
-          resetCountdown();
-          logDebugEvent(
-            "QUESTION_TIME reset"
-          );
-          logDebugEvent(
-            "Ready 結束",
-            {
-              ready: false
-            }
-          );
-          setReadyLeft(0);
-          setCountdownReady(false);
-          questionLiveRef.current = true;
-          setQuestionStarted(true);
-          return;
-        }
-
-        setReadyLeft(readyLeft - 1);
-      },
-      1000
-    );
-
-    return () =>
-      window.clearTimeout(timer);
+    timerPhaseKeyRef.current = phaseKey;
   }, [
-    logDebugEvent,
-    resetCountdown,
-    readyLeft,
-    roomData
+    gamePhase,
+    phaseKey,
+    timeLeft
   ]);
 
   useEffect(() => {
-    if (!questionStarted)
-      return;
-
-    if (roomData?.answerRevealed)
+    if (isRevealPhase)
       return;
 
     if (roomData?.winner)
@@ -432,11 +484,14 @@ export default function Game() {
     const timer = window.setInterval(
       () => {
         setTimeLeft(
-          (currentTime) =>
-            Math.max(
+          (currentTime) => {
+            const nextTime = Math.max(
               currentTime - 1,
               0
-            )
+            );
+
+            return nextTime;
+          }
         );
       },
       1000
@@ -445,34 +500,8 @@ export default function Game() {
     return () =>
       window.clearInterval(timer);
   }, [
-    questionStarted,
-    roomData?.answerRevealed,
+    isRevealPhase,
     roomData?.winner,
-    timeLeft
-  ]);
-
-  useEffect(() => {
-    if (!questionStarted)
-      return;
-
-    if (timeLeft <= 0)
-      return;
-
-    if (countdownReady)
-      return;
-
-    const timer = window.setTimeout(
-      () => {
-        setCountdownReady(true);
-      },
-      0
-    );
-
-    return () =>
-      window.clearTimeout(timer);
-  }, [
-    countdownReady,
-    questionStarted,
     timeLeft
   ]);
 
@@ -480,9 +509,7 @@ export default function Game() {
     async () => {
       if (!answer) return;
 
-      if (isReady) return;
-
-      if (!questionStarted) return;
+      if (!isAnsweringPhase) return;
 
       if (submitted) return;
 
@@ -526,6 +553,12 @@ export default function Game() {
     if (roomData.scored)
       return;
 
+    if (
+      roomData.gamePhase !== GAME_PHASES.ANSWERING &&
+      !DEV_MODE
+    )
+      return;
+
     const correctAnswer =
       roomData.currentMode ===
       "artist"
@@ -533,9 +566,9 @@ export default function Game() {
         : song.songName;
 
     const scoreGain =
-      DEV_MODE ? 10 : 1;
+      DEV_MODE ? GAME_CONFIG.WIN_SCORE : 1;
 
-    const currentAnswers =
+    const answersForQuestion =
       answers.filter(
         (answerData) =>
           answerData.gameRound ===
@@ -544,7 +577,7 @@ export default function Game() {
             roomData.currentQuestion
       );
 
-    for (const answerData of currentAnswers) {
+    for (const answerData of answersForQuestion) {
       const userAnswer =
         answerData.answer
           .trim()
@@ -582,7 +615,7 @@ export default function Game() {
             targetPlayer.score + scoreGain;
 
           if (
-            updatedScore >= 10
+            updatedScore >= GAME_CONFIG.WIN_SCORE
           ) {
             await updateDoc(
               doc(
@@ -608,7 +641,9 @@ export default function Game() {
       ),
       {
         answerRevealed: true,
-        scored: true
+        scored: true,
+        gamePhase: GAME_PHASES.REVEAL,
+        phaseStartedAt: Date.now()
       }
     );
   }, [
@@ -620,34 +655,26 @@ export default function Game() {
   ]);
 
   const nextQuestion = useCallback(async () => {
-    logDebugEvent(
-      "nextQuestion 被呼叫"
-    );
-
     if (!roomDocId)
       return;
 
     if (!roomData)
       return;
 
-    const randomSong =
-      await getRandomSong();
-
-    if (!randomSong)
+    if (
+      roomData.gamePhase !== GAME_PHASES.REVEAL &&
+      !DEV_MODE
+    )
       return;
 
-    const modes = [
-      "songName",
-      "artist"
-    ];
+    const songQueue =
+      [...(roomData.songQueue || [])];
 
-    const randomMode =
-      modes[
-        Math.floor(
-          Math.random() *
-            modes.length
-        )
-      ];
+    const nextSongId =
+      songQueue.shift();
+
+    if (!nextSongId)
+      return;
 
     await updateDoc(
       doc(
@@ -660,10 +687,18 @@ export default function Game() {
           roomData.currentQuestion + 1,
 
         currentSongId:
-          randomSong.id,
+          nextSongId,
 
         currentMode:
-          randomMode,
+          getRandomMode(),
+
+        songQueue,
+
+        gamePhase:
+          GAME_PHASES.PLAYING,
+
+        phaseStartedAt:
+          Date.now(),
 
         answerRevealed:
           false,
@@ -672,96 +707,119 @@ export default function Game() {
       }
     );
 
-    logDebugEvent(
-      "currentQuestion 更新",
-      {
-        currentQuestion:
-          roomData.currentQuestion + 1
-      }
-    );
-
     setAnswer("");
     setSubmitted(false);
-    resetCountdown();
-    logDebugEvent(
-      "QUESTION_TIME reset"
-    );
+    resetPhaseTimer(GAME_PHASES.PLAYING);
   }, [
-    logDebugEvent,
-    resetCountdown,
+    resetPhaseTimer,
     roomData,
     roomDocId
   ]);
 
-  useEffect(() => {
-    logDebugEvent(
-      "AutoReveal 判斷開始"
-    );
-
-    if (!isHost)
+  const advanceToAnswering = useCallback(async () => {
+    if (!roomDocId)
       return;
 
     if (!roomData)
       return;
 
-    if (roomData.answerRevealed)
-      return;
-
-    if (roomData.winner)
-      return;
-
-    if (isReady)
-      return;
-
-    if (!questionStarted)
-      return;
-
-    if (autoRevealTriggeredRef.current)
-      return;
-
     if (
-      activeQuestionKeyRef.current !==
-      questionKey
+      roomData.gamePhase !== GAME_PHASES.PLAYING
     )
       return;
 
-    if (!questionLiveRef.current)
-      return;
-
-    if (
-      !allAnswered &&
-      !timeExpired
-    )
-      return;
-
-    autoRevealTriggeredRef.current = true;
-
-    logDebugEvent(
-      "AutoReveal 真正執行"
-    );
-
-    revealAnswer();
+    try {
+      await updateDoc(
+        doc(
+          db,
+          "rooms",
+          roomDocId
+        ),
+        {
+          gamePhase:
+            GAME_PHASES.ANSWERING,
+          phaseStartedAt:
+            Date.now()
+        }
+      );
+    } catch (error) {
+      console.error(
+        "advanceToAnswering failed",
+        error
+      );
+    }
   }, [
-    allAnswered,
-    isHost,
-    isReady,
-    questionKey,
-    questionStarted,
-    logDebugEvent,
-    revealAnswer,
     roomData,
-    timeExpired
+    roomDocId
   ]);
 
   useEffect(() => {
     if (!isHost)
       return;
 
-    if (!roomData?.answerRevealed)
+    if (!roomDocId)
+      return;
+
+    if (!roomData)
       return;
 
     if (roomData.winner)
       return;
+
+    if (timeLeft > 0)
+      return;
+
+    if (timerPhaseKeyRef.current !== phaseKey)
+      return;
+
+    if (phaseAdvanceRef.current === phaseKey)
+      return;
+
+    phaseAdvanceRef.current = phaseKey;
+
+    if (isPlayingPhase) {
+      advanceToAnswering();
+      return;
+    }
+
+    if (isAnsweringPhase) {
+      revealAnswer();
+    }
+  }, [
+    advanceToAnswering,
+    gamePhase,
+    isAnsweringPhase,
+    isHost,
+    isPlayingPhase,
+    phaseKey,
+    revealAnswer,
+    roomData,
+    roomDocId,
+    timeLeft
+  ]);
+
+  useEffect(() => {
+    nextQuestionRef.current = nextQuestion;
+  }, [
+    nextQuestion
+  ]);
+
+  useEffect(() => {
+    if (!isHost)
+      return;
+
+    if (!isRevealPhase)
+      return;
+
+    if (roomData?.winner)
+      return;
+
+    if (
+      revealTimeoutKeyRef.current === phaseKey
+    )
+      return;
+
+    revealTimeoutKeyRef.current = phaseKey;
 
     if (nextQuestionTimerRef.current) {
       window.clearTimeout(
@@ -772,9 +830,9 @@ export default function Game() {
     nextQuestionTimerRef.current = window.setTimeout(
       () => {
         nextQuestionTimerRef.current = null;
-        nextQuestion();
+        nextQuestionRef.current?.();
       },
-      5000
+      REVEAL_TIME * 1000
     );
 
     return () => {
@@ -788,8 +846,8 @@ export default function Game() {
     };
   }, [
     isHost,
-    nextQuestion,
-    roomData?.answerRevealed,
+    isRevealPhase,
+    phaseKey,
     roomData?.winner
   ]);
 
@@ -805,15 +863,15 @@ export default function Game() {
       nextQuestionTimerRef.current = null;
     }
 
-    autoRevealTriggeredRef.current = false;
+    queueInitRef.current = false;
+    phaseAdvanceRef.current = "";
+    timerPhaseKeyRef.current = "";
+    revealTimeoutKeyRef.current = "";
 
     setAnswer("");
     setSubmitted(false);
     setAnswers([]);
-    setReadyLeft(READY_TIME);
-    setQuestionStarted(false);
-    setCountdownReady(false);
-    resetCountdown();
+    resetPhaseTimer(GAME_PHASES.PLAYING);
 
     for (const player of players) {
       await updateDoc(
@@ -828,24 +886,14 @@ export default function Game() {
       );
     }
 
-    const randomSong =
-      await getRandomSong();
+    const songQueue =
+      await fetchSongQueue();
 
-    if (!randomSong)
+    const questionState =
+      createQuestionState(songQueue);
+
+    if (!questionState)
       return;
-
-    const modes = [
-      "songName",
-      "artist"
-    ];
-
-    const randomMode =
-      modes[
-        Math.floor(
-          Math.random() *
-            modes.length
-        )
-      ];
 
     await updateDoc(
       doc(
@@ -861,19 +909,9 @@ export default function Game() {
 
         currentQuestion: 1,
 
-        currentSongId:
-          randomSong.id,
-
-        currentMode:
-          randomMode,
-
-        answerRevealed:
-          false,
-
-        scored: false
+        ...questionState
       }
     );
-
   };
 
   const devWinCurrentPlayer = async () => {
@@ -899,7 +937,8 @@ export default function Game() {
         targetPlayer.id
       ),
       {
-        score: 10
+        score:
+          GAME_CONFIG.WIN_SCORE
       }
     );
 
@@ -947,7 +986,7 @@ export default function Game() {
     const updatedScore =
       targetPlayer.score + 1;
 
-    if (updatedScore >= 10) {
+    if (updatedScore >= GAME_CONFIG.WIN_SCORE) {
       await updateDoc(
         doc(
           db,
@@ -1000,7 +1039,7 @@ export default function Game() {
       : song.songName;
 
   const scoreGain =
-    DEV_MODE ? 10 : 1;
+    DEV_MODE ? GAME_CONFIG.WIN_SCORE : 1;
 
   const currentPlayer =
     players.find(
@@ -1024,6 +1063,16 @@ export default function Game() {
           .trim()
           .toLowerCase()
     );
+
+  const phaseLabel =
+    isPlayingPhase
+      ? "🎵 播放中"
+      : isAnsweringPhase
+        ? "✍️ 作答中"
+        : "公布答案";
+
+  const timerMax =
+    getPhaseTime(gamePhase);
 
   if (roomData.winner) {
     return (
@@ -1057,61 +1106,61 @@ export default function Game() {
           playerName={playerName}
         />
 
-        {isReady ? (
-          <Card className="space-y-5 text-center">
-            <div className="text-3xl font-black text-yellow-300">
-              第 {roomData.currentQuestion} 題
-            </div>
-
-            <div className="text-xl font-bold text-white">
-              即將開始
-            </div>
-
-            <div className="text-7xl font-black text-yellow-400">
-              {readyLeft}
-            </div>
-          </Card>
-        ) : (
+        {!isRevealPhase && (
           <>
             <AudioPlayer
               key={
                 `${roomData.gameRound}-${roomData.currentQuestion}-${roomData.currentSongId}`
               }
-              url={getAudioUrl(song)}
+              spotifyId={song?.spotifyId}
             />
+
+            <Card className="text-center text-2xl font-black text-yellow-300">
+              {phaseLabel}
+            </Card>
 
             <CountdownCard
               timeLeft={timeLeft}
-              questionTime={QUESTION_TIME}
+              questionTime={timerMax}
               timeExpired={timeExpired}
-            />
-
-            {!submitted ? (
-              <AnswerInput
-                answer={answer}
-                onAnswerChange={(event) =>
-                  setAnswer(event.target.value)
-                }
-                onSubmit={submitAnswer}
-                timeExpired={timeExpired}
-              />
-            ) : (
-              <WaitingCard
-                answersCount={currentAnswers.length}
-                playersCount={players.length}
-              />
-            )}
-
-            <AnswerStatusCard
-              answersCount={currentAnswers.length}
-              playersCount={players.length}
-              allAnswered={allAnswered}
             />
           </>
         )}
 
+        {isPlayingPhase && (
+          <WaitingCard
+            answersCount={currentAnswers.length}
+            playersCount={players.length}
+          />
+        )}
 
-        {roomData.answerRevealed && (
+        {isAnsweringPhase && (
+          !submitted ? (
+            <AnswerInput
+              answer={answer}
+              onAnswerChange={(event) =>
+                setAnswer(event.target.value)
+              }
+              onSubmit={submitAnswer}
+              timeExpired={timeExpired}
+            />
+          ) : (
+            <WaitingCard
+              answersCount={currentAnswers.length}
+              playersCount={players.length}
+            />
+          )
+        )}
+
+        {isAnsweringPhase && (
+          <AnswerStatusCard
+            answersCount={currentAnswers.length}
+            playersCount={players.length}
+            allAnswered={allAnswered}
+          />
+        )}
+
+        {isRevealPhase && (
           <RevealCard
             song={song}
             correctPlayers={correctPlayers}
@@ -1119,13 +1168,13 @@ export default function Game() {
           />
         )}
 
-        {roomData.answerRevealed && (
+        {isRevealPhase && (
           <RankingCard players={sortedPlayers} />
         )}
 
         {isHost && (
           <HostControlCard
-            answerRevealed={roomData.answerRevealed}
+            answerRevealed={isRevealPhase}
             allAnswered={allAnswered}
             timeExpired={timeExpired}
             onReveal={revealAnswer}
