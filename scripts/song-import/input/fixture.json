@@ -1,0 +1,52 @@
+[
+  {
+    "title": "  精準配對測試  ",
+    "artist": " 測試歌手甲 ",
+    "category": "mandarin",
+    "decade": "2020",
+    "difficulty": "2",
+    "spotifyId": "fixture-spotify-shared",
+    "previewUrl": "https://example.invalid/previews/shared.mp3"
+  },
+  {
+    "songName": "月亮代表我的心",
+    "artist": "鄧麗君",
+    "difficulty": 1
+  },
+  {
+    "songName": "歌手不符測試",
+    "artist": "正確歌手",
+    "spotifyId": "fixture-spotify-shared",
+    "previewUrl": "https://example.invalid/previews/shared.mp3"
+  },
+  {
+    "songName": "微小差異測試",
+    "artist": "測試歌手丙",
+    "difficulty": "3"
+  },
+  {
+    "songName": "模糊配對測試",
+    "artist": "測試歌手丁"
+  },
+  {
+    "songName": "找不到測試",
+    "artist": "測試歌手戊"
+  },
+  {
+    "songName": "Provider 錯誤測試",
+    "artist": "測試歌手己"
+  },
+  {
+    "id": "M000900",
+    "songName": "重複歌曲與編號",
+    "artist": "測試歌手庚"
+  },
+  {
+    "id": "M000900",
+    "songName": " 重複歌曲與編號 ",
+    "artist": " 測試歌手庚 "
+  },
+  {
+    "difficulty": 1
+  }
+]

@@ -26,3 +26,4 @@ dist-ssr
 .env.local
 scripts/serviceAccountKey.json
 serviceAccountKey.json
+scripts/song-import/output/*.json
