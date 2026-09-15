@@ -8,6 +8,7 @@
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
+    "test:rules": "firebase emulators:exec --project golden-song-king-rules-test --only firestore \"node --test tests/firestore.rules.test.js\"",
     "songs:dry-run": "node scripts/song-import/importDryRun.js",
     "songs:match": "node scripts/song-import/audioMatchDryRun.js",
     "songs:provider-probe": "node scripts/song-import/providerFeasibilityProbe.js"
@@ -25,12 +26,14 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@firebase/rules-unit-testing": "^5.0.2",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
     "eslint": "^10.3.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
+    "firebase-tools": "^15.30.1",
     "globals": "^17.6.0",
     "vite": "^8.0.12"
   }

@@ -1,0 +1,277 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function roomPath(roomDocId) {
+      return /databases/$(database)/documents/rooms/$(roomDocId);
+    }
+
+    function roomExists(roomDocId) {
+      return exists(roomPath(roomDocId));
+    }
+
+    function isRoomHost(roomDocId) {
+      return isSignedIn()
+        && roomExists(roomDocId)
+        && get(roomPath(roomDocId)).data.hostUid == request.auth.uid;
+    }
+
+    function hasOnlyRoomFields(data) {
+      return data.keys().hasOnly([
+        'roomId',
+        'hostName',
+        'hostUid',
+        'category',
+        'status',
+        'gameRound',
+        'currentQuestion',
+        'gameMode',
+        'currentMode',
+        'currentSongId',
+        'songQueue',
+        'gamePhase',
+        'phaseStartedAt',
+        'answerRevealed',
+        'scored',
+        'winner',
+        'createdAt'
+      ]);
+    }
+
+    function hasRequiredRoomFields(data) {
+      return data.keys().hasAll([
+        'roomId',
+        'hostName',
+        'hostUid',
+        'category',
+        'status',
+        'gameRound',
+        'currentQuestion',
+        'gameMode',
+        'answerRevealed',
+        'scored',
+        'winner',
+        'createdAt'
+      ]);
+    }
+
+    function hasValidRoomData(data) {
+      return hasOnlyRoomFields(data)
+        && hasRequiredRoomFields(data)
+        && data.roomId is string
+        && data.roomId.matches('^[0-9]{6}$')
+        && data.hostName is string
+        && data.hostName.size() > 0
+        && data.hostName.size() <= 50
+        && data.hostUid is string
+        && data.hostUid.size() > 0
+        && data.category in [
+          'all',
+          'mandarin',
+          'taiwanese',
+          'western',
+          'anime',
+          'kpop'
+        ]
+        && data.status in ['waiting', 'playing']
+        && data.gameRound is int
+        && data.gameRound >= 1
+        && data.currentQuestion is int
+        && data.currentQuestion >= 1
+        && data.gameMode in ['songName', 'artist', 'lyric']
+        && data.answerRevealed is bool
+        && data.scored is bool
+        && data.winner is string
+        && data.createdAt is int
+        && data.createdAt > 0
+        && (!('currentMode' in data)
+          || data.currentMode in ['songName', 'artist'])
+        && (!('currentSongId' in data)
+          || data.currentSongId is string)
+        && (!('songQueue' in data)
+          || data.songQueue is list)
+        && (!('gamePhase' in data)
+          || data.gamePhase in ['PLAYING', 'ANSWERING', 'REVEAL'])
+        && (!('phaseStartedAt' in data)
+          || (data.phaseStartedAt is int && data.phaseStartedAt > 0));
+    }
+
+    function isValidRoomCreate() {
+      return hasValidRoomData(request.resource.data)
+        && request.resource.data.hostUid == request.auth.uid
+        && request.resource.data.status == 'waiting'
+        && request.resource.data.gameRound == 1
+        && request.resource.data.currentQuestion == 1
+        && request.resource.data.answerRevealed == false
+        && request.resource.data.scored == false
+        && request.resource.data.winner == '';
+    }
+
+    function isValidRoomUpdate() {
+      return hasValidRoomData(request.resource.data)
+        && request.resource.data.hostUid == resource.data.hostUid
+        && request.resource.data.roomId == resource.data.roomId
+        && request.resource.data.hostName == resource.data.hostName
+        && request.resource.data.category == resource.data.category
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status',
+          'gameRound',
+          'currentQuestion',
+          'gameMode',
+          'currentMode',
+          'currentSongId',
+          'songQueue',
+          'gamePhase',
+          'phaseStartedAt',
+          'answerRevealed',
+          'scored',
+          'winner'
+        ]);
+    }
+
+    function hasOnlyPlayerFields(data) {
+      return data.keys().hasOnly([
+        'name',
+        'roomId',
+        'roomDocId',
+        'uid',
+        'score',
+        'isHost',
+        'joinedAt'
+      ]);
+    }
+
+    function hasValidPlayerData(data) {
+      return hasOnlyPlayerFields(data)
+        && data.keys().hasAll([
+          'name',
+          'roomId',
+          'roomDocId',
+          'uid',
+          'score',
+          'isHost',
+          'joinedAt'
+        ])
+        && data.name is string
+        && data.name.size() > 0
+        && data.name.size() <= 50
+        && data.roomId is string
+        && data.roomId.matches('^[0-9]{6}$')
+        && data.roomDocId is string
+        && data.roomDocId.size() > 0
+        && data.uid is string
+        && data.uid.size() > 0
+        && data.score is int
+        && data.score >= 0
+        && data.isHost is bool
+        && data.joinedAt is int
+        && data.joinedAt > 0;
+    }
+
+    function isValidPlayerCreate() {
+      let room = get(roomPath(request.resource.data.roomDocId));
+      return hasValidPlayerData(request.resource.data)
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.score == 0
+        && roomExists(request.resource.data.roomDocId)
+        && request.resource.data.roomId == room.data.roomId
+        && (request.resource.data.isHost == false
+          || request.auth.uid == room.data.hostUid);
+    }
+
+    function isValidPlayerUpdate() {
+      return hasValidPlayerData(request.resource.data)
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.roomDocId == resource.data.roomDocId
+        && request.resource.data.roomId == resource.data.roomId
+        && request.resource.data.name == resource.data.name
+        && request.resource.data.isHost == resource.data.isHost
+        && request.resource.data.joinedAt == resource.data.joinedAt
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'score'
+        ]);
+    }
+
+    function isPlayerOwnerOrRoomHost() {
+      return isSignedIn()
+        && (request.auth.uid == resource.data.uid
+          || isRoomHost(resource.data.roomDocId));
+    }
+
+    function hasValidAnswerData(data) {
+      return data.keys().hasOnly([
+        'roomId',
+        'playerName',
+        'answer',
+        'gameRound',
+        'questionNumber',
+        'createdAt',
+        'uid'
+      ])
+        && data.keys().hasAll([
+          'roomId',
+          'playerName',
+          'answer',
+          'gameRound',
+          'questionNumber',
+          'createdAt',
+          'uid'
+        ])
+        && data.roomId is string
+        && data.roomId.matches('^[0-9]{6}$')
+        && data.playerName is string
+        && data.playerName.size() > 0
+        && data.playerName.size() <= 50
+        && data.answer is string
+        && data.answer.size() > 0
+        && data.answer.size() <= 200
+        && data.gameRound is int
+        && data.gameRound >= 1
+        && data.questionNumber is int
+        && data.questionNumber >= 1
+        && data.createdAt is int
+        && data.createdAt > 0
+        && data.uid is string
+        && data.uid.size() > 0;
+    }
+
+    match /songs/{songId} {
+      allow read: if isSignedIn();
+      allow create, update, delete: if false;
+    }
+
+    match /rooms/{roomDocId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidRoomCreate();
+      allow update: if isSignedIn()
+        && request.auth.uid == resource.data.hostUid
+        && isValidRoomUpdate();
+      allow delete: if false;
+    }
+
+    match /players/{playerDocId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn() && isValidPlayerCreate();
+      allow update: if isPlayerOwnerOrRoomHost()
+        && isValidPlayerUpdate();
+      allow delete: if false;
+    }
+
+    match /answers/{answerDocId} {
+      allow read: if isSignedIn();
+      allow create: if isSignedIn()
+        && hasValidAnswerData(request.resource.data)
+        && request.resource.data.uid == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

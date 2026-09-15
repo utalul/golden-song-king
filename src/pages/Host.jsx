@@ -3,6 +3,7 @@ import { collection, addDoc } from "firebase/firestore";
 import { Link } from "react-router-dom";
 
 import { db } from "../firebase/firebase";
+import { ensureAnonymousAuth } from "../firebase/auth";
 
 import Page from "../components/ui/Page";
 
@@ -25,6 +26,16 @@ export default function Host() {
       return;
     }
 
+    let authUser;
+
+    try {
+      authUser = await ensureAnonymousAuth();
+    } catch (error) {
+      console.error("匿名登入失敗：", error);
+      alert("無法連線，請稍後再試");
+      return;
+    }
+
     const roomId = Math.floor(
       100000 + Math.random() * 900000
     ).toString();
@@ -42,11 +53,12 @@ export default function Host() {
         )
       ];
 
-    await addDoc(
+    const roomRef = await addDoc(
   collection(db, "rooms"),
   {
     roomId,
     hostName,
+    hostUid: authUser.uid,
 
     category,
 
@@ -74,6 +86,8 @@ export default function Host() {
         name: hostName,
 
         roomId,
+        roomDocId: roomRef.id,
+        uid: authUser.uid,
 
         score: 0,
 
@@ -83,6 +97,7 @@ export default function Host() {
       }
     );
 
+    // This flag controls UI only; Firestore authorization must use Firebase Auth.
     localStorage.setItem(
       "roomId",
       roomId

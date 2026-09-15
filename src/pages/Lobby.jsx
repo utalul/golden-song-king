@@ -10,6 +10,7 @@ import {
 
 import { useNavigate } from "react-router-dom";
 import { db } from "../firebase/firebase";
+import { ensureAnonymousAuth } from "../firebase/auth";
 
 import Page from "../components/ui/Page";
 import { GAME_MODE_LABELS, CATEGORY_LABELS } from "../constants/gameMode";
@@ -106,7 +107,24 @@ export default function Lobby() {
   }, [roomId, navigate]);
 
   const startGame = async () => {
-  if (!roomDocId) return;
+  if (!roomDocId || !roomData) return;
+
+  let authUser;
+
+  try {
+    authUser = await ensureAnonymousAuth();
+  } catch (error) {
+    console.error("匿名登入失敗：", error);
+    return;
+  }
+
+  if (
+    !roomData.hostUid ||
+    roomData.hostUid !== authUser.uid
+  ) {
+    console.error("主持人身分驗證失敗");
+    return;
+  }
 
   const randomSong = await getRandomSong();
 

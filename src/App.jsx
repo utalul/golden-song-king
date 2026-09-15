@@ -1,4 +1,8 @@
 import {
+  lazy,
+  Suspense
+} from "react";
+import {
   BrowserRouter,
   Routes,
   Route
@@ -9,9 +13,14 @@ import Host from "./pages/Host";
 import Join from "./pages/Join";
 import Lobby from "./pages/Lobby";
 import Game from "./pages/Game";
-import ImportSongs from "./pages/ImportSongs";
-import Admin from "./pages/Admin";
-import AudioTest from "./pages/AudioTest";
+
+const developmentPages = import.meta.env.DEV
+  ? {
+      ImportSongs: lazy(() => import("./pages/ImportSongs")),
+      Admin: lazy(() => import("./pages/Admin")),
+      AudioTest: lazy(() => import("./pages/AudioTest"))
+    }
+  : null;
 
 function App() {
   return (
@@ -41,22 +50,38 @@ function App() {
           path="/game"
           element={<Game />}
         />
-<Route
-  path="/import"
-  element={<ImportSongs />}
-/>
 
-<Route
-  path="/admin"
-  element={<Admin />}
-/>
+        {developmentPages && (
+          <>
+            <Route
+              path="/import"
+              element={(
+                <Suspense fallback={null}>
+                  <developmentPages.ImportSongs />
+                </Suspense>
+              )}
+            />
 
-<Route
-  path="/audio-test"
-  element={<AudioTest />}
-/>
+            <Route
+              path="/admin"
+              element={(
+                <Suspense fallback={null}>
+                  <developmentPages.Admin />
+                </Suspense>
+              )}
+            />
 
-</Routes>
+            <Route
+              path="/audio-test"
+              element={(
+                <Suspense fallback={null}>
+                  <developmentPages.AudioTest />
+                </Suspense>
+              )}
+            />
+          </>
+        )}
+      </Routes>
     </BrowserRouter>
   );
 }

@@ -9,6 +9,7 @@ import {
 import { Link } from "react-router-dom";
 
 import { db } from "../firebase/firebase";
+import { ensureAnonymousAuth } from "../firebase/auth";
 
 import Page from "../components/ui/Page";
 
@@ -28,6 +29,17 @@ export default function Join() {
       return;
     }
 
+    let authUser;
+
+    try {
+      authUser = await ensureAnonymousAuth();
+    } catch (error) {
+      console.error("匿名登入失敗：", error);
+      setJoining(false);
+      alert("無法連線，請稍後再試");
+      return;
+    }
+
     const roomQuery = query(
       collection(db, "rooms"),
       where("roomId", "==", roomId)
@@ -38,6 +50,15 @@ export default function Join() {
     if (roomSnapshot.empty) {
       setJoining(false);
       alert("房號不存在");
+      return;
+    }
+
+    const roomDocument = roomSnapshot.docs[0];
+
+    if (!roomDocument.data().hostUid) {
+      console.error("房間缺少主持人身分資料");
+      setJoining(false);
+      alert("此房間版本過舊，請房主重新建立房間");
       return;
     }
 
@@ -61,12 +82,15 @@ export default function Join() {
       {
         name,
         roomId,
+        roomDocId: roomDocument.id,
+        uid: authUser.uid,
         score: 0,
         isHost: false,
         joinedAt: Date.now()
       }
     );
 
+    // This flag controls UI only; Firestore authorization must use Firebase Auth.
     localStorage.setItem("roomId", roomId);
     localStorage.setItem("playerName", name);
     localStorage.setItem("isHost", "false");

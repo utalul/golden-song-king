@@ -18,6 +18,7 @@ import {
 } from "firebase/firestore";
 
 import { db } from "../firebase/firebase";
+import { ensureAnonymousAuth } from "../firebase/auth";
 
 import Page from "../components/ui/Page";
 import Logo from "../components/ui/Logo";
@@ -158,6 +159,30 @@ export default function Game() {
 
   const phaseKey =
     `${questionKey}-${gamePhase}`;
+
+  const roomHostUid =
+    roomData?.hostUid || "";
+
+  const authorizeHost = useCallback(async () => {
+    let authUser;
+
+    try {
+      authUser = await ensureAnonymousAuth();
+    } catch (error) {
+      console.error("匿名登入失敗：", error);
+      return null;
+    }
+
+    if (
+      !roomHostUid ||
+      roomHostUid !== authUser.uid
+    ) {
+      console.error("主持人身分驗證失敗");
+      return null;
+    }
+
+    return authUser;
+  }, [roomHostUid]);
 
   const currentAnswers =
     roomData
@@ -349,6 +374,11 @@ export default function Game() {
     queueInitRef.current = true;
 
     async function initializeSongQueue() {
+      const authUser = await authorizeHost();
+
+      if (!authUser)
+        return;
+
       const songQueue =
         await fetchSongQueue();
 
@@ -374,6 +404,7 @@ export default function Game() {
 
     initializeSongQueue();
   }, [
+    authorizeHost,
     createQuestionState,
     fetchSongQueue,
     isHost,
@@ -511,6 +542,29 @@ export default function Game() {
 
       if (!roomData) return;
 
+      let authUser;
+
+      try {
+        authUser = await ensureAnonymousAuth();
+      } catch (error) {
+        console.error("匿名登入失敗：", error);
+        return;
+      }
+
+      const currentPlayer = players.find(
+        (player) =>
+          player.name === playerName &&
+          player.roomDocId === roomDocId
+      );
+
+      if (
+        !currentPlayer?.uid ||
+        currentPlayer.uid !== authUser.uid
+      ) {
+        console.error("玩家身分驗證失敗");
+        return;
+      }
+
       await addDoc(
         collection(
           db,
@@ -519,6 +573,7 @@ export default function Game() {
         {
           roomId,
           playerName,
+          uid: authUser.uid,
 
           answer,
 
@@ -553,6 +608,11 @@ export default function Game() {
       roomData.gamePhase !== GAME_PHASES.ANSWERING &&
       !DEV_MODE
     )
+      return;
+
+    const authUser = await authorizeHost();
+
+    if (!authUser)
       return;
 
     const correctAnswer =
@@ -594,7 +654,11 @@ export default function Game() {
               answerData.playerName
           );
 
-        if (targetPlayer) {
+        if (
+          targetPlayer?.uid &&
+          answerData.uid === targetPlayer.uid &&
+          targetPlayer.roomDocId === roomDocId
+        ) {
           await updateDoc(
             doc(
               db,
@@ -644,6 +708,7 @@ export default function Game() {
     );
   }, [
     answers,
+    authorizeHost,
     players,
     roomData,
     roomDocId,
@@ -661,6 +726,11 @@ export default function Game() {
       roomData.gamePhase !== GAME_PHASES.REVEAL &&
       !DEV_MODE
     )
+      return;
+
+    const authUser = await authorizeHost();
+
+    if (!authUser)
       return;
 
     const songQueue =
@@ -707,6 +777,7 @@ export default function Game() {
     setSubmitted(false);
     resetPhaseTimer(GAME_PHASES.PLAYING);
   }, [
+    authorizeHost,
     resetPhaseTimer,
     roomData,
     roomDocId
@@ -722,6 +793,11 @@ export default function Game() {
     if (
       roomData.gamePhase !== GAME_PHASES.PLAYING
     )
+      return;
+
+    const authUser = await authorizeHost();
+
+    if (!authUser)
       return;
 
     try {
@@ -745,6 +821,7 @@ export default function Game() {
       );
     }
   }, [
+    authorizeHost,
     roomData,
     roomDocId
   ]);
@@ -851,6 +928,11 @@ export default function Game() {
     if (!roomDocId)
       return;
 
+    const authUser = await authorizeHost();
+
+    if (!authUser)
+      return;
+
     if (nextQuestionTimerRef.current) {
       window.clearTimeout(
         nextQuestionTimerRef.current
@@ -870,6 +952,14 @@ export default function Game() {
     resetPhaseTimer(GAME_PHASES.PLAYING);
 
     for (const player of players) {
+      if (
+        !player.uid ||
+        player.roomDocId !== roomDocId
+      ) {
+        console.error("玩家身分資料不完整，略過分數重設");
+        continue;
+      }
+
       await updateDoc(
         doc(
           db,
@@ -917,13 +1007,22 @@ export default function Game() {
     if (!roomDocId)
       return;
 
+    const authUser = await authorizeHost();
+
+    if (!authUser)
+      return;
+
     const targetPlayer =
       players.find(
         (player) =>
           player.name === playerName
       );
 
-    if (!targetPlayer)
+    if (
+      !targetPlayer ||
+      targetPlayer.uid !== authUser.uid ||
+      targetPlayer.roomDocId !== roomDocId
+    )
       return;
 
     await updateDoc(
@@ -958,13 +1057,22 @@ export default function Game() {
     if (!roomDocId)
       return;
 
+    const authUser = await authorizeHost();
+
+    if (!authUser)
+      return;
+
     const targetPlayer =
       players.find(
         (player) =>
           player.name === playerName
       );
 
-    if (!targetPlayer)
+    if (
+      !targetPlayer ||
+      targetPlayer.uid !== authUser.uid ||
+      targetPlayer.roomDocId !== roomDocId
+    )
       return;
 
     await updateDoc(
