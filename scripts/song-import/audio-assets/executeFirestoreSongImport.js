@@ -26,6 +26,10 @@ const SONG_COLLECTION = "songs";
 const EXPECTED_FIRST_ID = 51;
 const EXPECTED_LAST_ID = 145;
 const EXPECTED_COUNT = 95;
+const FINAL_FIRST_ID = 146;
+const FINAL_LAST_ID = 159;
+const FINAL_COUNT = 14;
+const FINAL_IMPORT_PROFILE = "FINAL_14";
 const HTTP_CONCURRENCY = 8;
 const CREATE_CONCURRENCY = 5;
 const MAX_CREATE_ATTEMPTS = 3;
@@ -90,6 +94,31 @@ function expectedPreviewUrl(songId) {
   return `${PRODUCTION_ORIGIN}/${songId}/preview.mp3`;
 }
 
+function getProductionProfile(plan) {
+  if (plan?.importProfile === FINAL_IMPORT_PROFILE) {
+    return {
+      firstId: FINAL_FIRST_ID,
+      lastId: FINAL_LAST_ID,
+      count: FINAL_COUNT,
+      protectedLastId: EXPECTED_LAST_ID
+    };
+  }
+
+  if (!plan?.importProfile) {
+    return {
+      firstId: EXPECTED_FIRST_ID,
+      lastId: EXPECTED_LAST_ID,
+      count: EXPECTED_COUNT,
+      protectedLastId: EXPECTED_FIRST_ID - 1
+    };
+  }
+
+  throw new ImportExecutionError(
+    "IMPORT_PROFILE_INVALID",
+    `不支援的 production import profile：${plan.importProfile}`
+  );
+}
+
 function sortedKeys(value) {
   return Object.keys(value).sort((left, right) => left.localeCompare(right));
 }
@@ -141,6 +170,9 @@ function validateCanonicalDocument(songId, document) {
 
 function validateDryRunPlan(plan, { enforceProductionCount = true } = {}) {
   const summary = plan?.summary;
+  const productionProfile = enforceProductionCount
+    ? getProductionProfile(plan)
+    : null;
 
   if (
     plan?.mode !== "READ_ONLY_DRY_RUN" ||
@@ -172,13 +204,17 @@ function validateDryRunPlan(plan, { enforceProductionCount = true } = {}) {
 
   if (
     enforceProductionCount &&
-    (summary.candidateCount !== EXPECTED_COUNT ||
-      songs[0]?.songId !== expectedSongId(EXPECTED_FIRST_ID) ||
-      songs.at(-1)?.songId !== expectedSongId(EXPECTED_LAST_ID))
+    (summary.candidateCount !== productionProfile.count ||
+      songs[0]?.songId !== expectedSongId(productionProfile.firstId) ||
+      songs.at(-1)?.songId !== expectedSongId(productionProfile.lastId))
   ) {
     throw new ImportExecutionError(
       "DRY_RUN_EXPECTED_RANGE_MISMATCH",
-      "Dry-run 必須完整包含 M000051–M000145 共 95 首。"
+      `Dry-run 必須完整包含 ${expectedSongId(
+        productionProfile.firstId
+      )}–${expectedSongId(productionProfile.lastId)} 共 ${
+        productionProfile.count
+      } 首。`
     );
   }
 
@@ -188,7 +224,7 @@ function validateDryRunPlan(plan, { enforceProductionCount = true } = {}) {
   songs.forEach((song, index) => {
     if (
       enforceProductionCount &&
-      song.songId !== expectedSongId(EXPECTED_FIRST_ID + index)
+      song.songId !== expectedSongId(productionProfile.firstId + index)
     ) {
       throw new ImportExecutionError(
         "DRY_RUN_ID_GAP",
@@ -376,13 +412,16 @@ function hashDocuments(documents) {
     .digest("hex");
 }
 
-function protectedSongIds() {
-  return Array.from({ length: 50 }, (_, index) => expectedSongId(index + 1));
+function protectedSongIds(lastId = EXPECTED_FIRST_ID - 1) {
+  return Array.from(
+    { length: lastId },
+    (_, index) => expectedSongId(index + 1)
+  );
 }
 
-function extractProtectedSnapshot(existingSongs) {
+function extractProtectedSnapshot(existingSongs, lastId) {
   const byId = new Map(existingSongs.map((song) => [song.id, song]));
-  const snapshot = protectedSongIds().map((id) => byId.get(id) || {
+  const snapshot = protectedSongIds(lastId).map((id) => byId.get(id) || {
     id,
     exists: false,
     data: null
@@ -391,7 +430,7 @@ function extractProtectedSnapshot(existingSongs) {
   if (snapshot.some((song) => !song.exists)) {
     throw new ImportExecutionError(
       "PROTECTED_LIBRARY_INCOMPLETE",
-      "M000001–M000050 protected snapshot 不完整。"
+      `M000001–${expectedSongId(lastId)} protected snapshot 不完整。`
     );
   }
 
@@ -540,6 +579,9 @@ export async function executeFirestoreSongImport({
   }
 
   const startedAt = new Date().toISOString();
+  const productionProfile = enforceProductionCount
+    ? getProductionProfile(plan)
+    : getProductionProfile({});
   const plannedSongs = validateDryRunPlan(plan, { enforceProductionCount });
   const previewChecks = await mapWithConcurrency(
     plannedSongs,
@@ -582,7 +624,10 @@ export async function executeFirestoreSongImport({
     );
   }
 
-  const protectedBefore = extractProtectedSnapshot(existingBefore);
+  const protectedBefore = extractProtectedSnapshot(
+    existingBefore,
+    productionProfile.protectedLastId
+  );
   const protectedBeforeHash = hashDocuments(protectedBefore);
   const createResults = await mapWithConcurrency(
     plannedSongs,
@@ -591,7 +636,11 @@ export async function executeFirestoreSongImport({
   );
   const readBack = await adapter.readDocuments(plannedIds);
   const readBackById = new Map(readBack.map((document) => [document.id, document]));
-  const protectedAfter = await adapter.readDocuments(protectedSongIds());
+  const existingAfter = await adapter.readAllSongs();
+  const protectedAfter = extractProtectedSnapshot(
+    existingAfter,
+    productionProfile.protectedLastId
+  );
   const protectedAfterHash = hashDocuments(protectedAfter);
   const protectedExistingUnchanged = protectedBeforeHash === protectedAfterHash;
 
@@ -641,6 +690,8 @@ export async function executeFirestoreSongImport({
     startedAt,
     completedAt: new Date().toISOString(),
     plannedCount: plannedSongs.length,
+    preWriteCollectionCount: existingBefore.length,
+    collectionCountAfter: existingAfter.length,
     previewRevalidated: previewChecks.length,
     preWriteIdConflicts: 0,
     preWriteIdentityConflicts: 0,
@@ -649,7 +700,9 @@ export async function executeFirestoreSongImport({
     verifiedCount,
     status,
     protectedExistingLibrary: {
-      range: "M000001-M000050",
+      range: `M000001-${expectedSongId(
+        productionProfile.protectedLastId
+      )}`,
       beforeHash: protectedBeforeHash,
       afterHash: protectedAfterHash,
       unchanged: protectedExistingUnchanged
@@ -772,11 +825,18 @@ function createFakeAdapter({
       });
     },
     async readAllSongs() {
-      return [...store.entries()].map(([id, data]) => ({
-        id,
-        exists: true,
-        data: { ...data }
-      }));
+      return [...store.entries()].map(([id, data]) => {
+        const returnedData =
+          hasCreated && tamperProtected && id === "M000001"
+            ? { ...data, songName: "保護資料遭變更" }
+            : { ...data };
+
+        return {
+          id,
+          exists: true,
+          data: returnedData
+        };
+      });
     },
     async createSong(songId, data) {
       createAttempts += 1;
@@ -816,6 +876,17 @@ function successfulFetch() {
 
 export async function runSelfTest() {
   const plan = fixturePlan();
+  const finalProfile = getProductionProfile({
+    importProfile: FINAL_IMPORT_PROFILE
+  });
+
+  assert.deepEqual(finalProfile, {
+    firstId: FINAL_FIRST_ID,
+    lastId: FINAL_LAST_ID,
+    count: FINAL_COUNT,
+    protectedLastId: EXPECTED_LAST_ID
+  });
+  assert.equal(protectedSongIds(finalProfile.protectedLastId).length, 145);
 
   await assert.rejects(
     executeFirestoreSongImport({
@@ -941,7 +1012,9 @@ export async function runSelfTest() {
       createOnlyBehavior: true,
       partialFailureReport: true,
       readBackMismatch: true,
-      protectedExistingDocumentsUnchanged: true
+      protectedExistingDocumentsUnchanged: true,
+      final14Profile: true,
+      final14ProtectedRange: true
     }
   };
 }
@@ -1042,7 +1115,10 @@ async function runCli() {
     console.log(`Created：${report.createdCount}`);
     console.log(`Failed：${report.failedCount}`);
     console.log(`Read-back verified：${report.verifiedCount}`);
-    console.log(`Protected M000001-M000050 unchanged：${report.protectedExistingLibrary.unchanged}`);
+    console.log(
+      `Protected ${report.protectedExistingLibrary.range} unchanged：${report.protectedExistingLibrary.unchanged}`
+    );
+    console.log(`Collection count after：${report.collectionCountAfter}`);
     console.log(`Status：${report.status}`);
     console.log(`Report：${path.resolve(options.outputFile)}`);
 

@@ -23,6 +23,14 @@ const DEFAULT_REPORT_FILE = path.join(
   projectRoot,
   "dist/audio-library-audit/pages-preview-build-report.json"
 );
+const DEFAULT_FINAL_RESOLUTION_AUDIT = path.join(
+  projectRoot,
+  "dist/audio-library-audit/pop-music-audit-v3.json"
+);
+const DEFAULT_FINAL_REPORT_FILE = path.join(
+  projectRoot,
+  "dist/audio-library-audit/final-14-preview-build-report.json"
+);
 const DEFAULT_PRESERVED_PREVIEW = path.join(
   projectRoot,
   "public/audio/test.mp3"
@@ -266,6 +274,61 @@ function validateCandidateReport(report) {
   }
 }
 
+function isFinalResolutionReport(report) {
+  return (
+    report?.mode === "READ_ONLY_FINAL_RESOLUTION" &&
+    Array.isArray(report?.items)
+  );
+}
+
+function normalizeFinalResolutionReport(report, audit, auditFile) {
+  const auditAssets = new Map(
+    audit.assets.map((asset) => [
+      toPortablePath(asset.relativePath),
+      asset
+    ])
+  );
+  const readyItems = report.items.filter(
+    (item) => item.resolutionStatus === READY_FOR_IMPORT
+  );
+
+  if (
+    readyItems.length !== 14 ||
+    report.items.some(
+      (item) => item.resolutionStatus === "NEEDS_FINAL_CONFIRMATION"
+    )
+  ) {
+    throw new PreviewBuildError("FINAL_RESOLUTION_STATUS_INVALID");
+  }
+
+  return {
+    source: { auditFile },
+    readyForImport: readyItems.map((item) => {
+      const relativePath = toPortablePath(item.sourceFile || "");
+      const auditAsset = auditAssets.get(relativePath);
+
+      if (!auditAsset) {
+        throw new PreviewBuildError(
+          "FINAL_RESOLUTION_SOURCE_NOT_IN_AUDIT"
+        );
+      }
+
+      return {
+        proposedId: item.proposedId,
+        songName: item.canonicalSongName,
+        artist: item.canonicalArtist,
+        status: READY_FOR_IMPORT,
+        sourceAudio: {
+          relativePath,
+          extension: auditAsset.extension,
+          sha256: item.sha256,
+          durationSeconds: auditAsset.durationSeconds
+        }
+      };
+    })
+  };
+}
+
 function validateProductionPaths(stagingRoot, reportFile) {
   const resolvedStaging = path.resolve(stagingRoot);
   const resolvedReport = path.resolve(reportFile);
@@ -463,14 +526,98 @@ function enumerateStagingFiles(stagingRoot) {
   return files.sort();
 }
 
+function expectedExistingPreviewPaths() {
+  return [
+    "M000001/preview.mp3",
+    ...Array.from(
+      { length: 95 },
+      (_, index) => `M${String(index + 51).padStart(6, "0")}/preview.mp3`
+    )
+  ];
+}
+
+function snapshotStagingFiles(stagingRoot, expectedPaths) {
+  if (
+    !fs.existsSync(stagingRoot) ||
+    !fs.statSync(stagingRoot).isDirectory()
+  ) {
+    throw new PreviewBuildError("EXISTING_STAGING_MISSING");
+  }
+
+  const actualPaths = enumerateStagingFiles(stagingRoot);
+  const sortedExpected = [...expectedPaths].sort();
+  if (
+    actualPaths.length !== sortedExpected.length ||
+    actualPaths.some(
+      (filePath, index) => filePath !== sortedExpected[index]
+    )
+  ) {
+    throw new PreviewBuildError("EXISTING_STAGING_CONTENT_MISMATCH");
+  }
+
+  return actualPaths.map((relativePath) => {
+    const absolutePath = path.join(stagingRoot, relativePath);
+    return {
+      relativePath,
+      sizeBytes: fs.statSync(absolutePath).size,
+      sha256: hashFile(absolutePath)
+    };
+  });
+}
+
+function validatePreservedStaging(stagingRoot, snapshot) {
+  return snapshot.every((entry) => {
+    const absolutePath = path.join(stagingRoot, entry.relativePath);
+    return (
+      fs.existsSync(absolutePath) &&
+      fs.statSync(absolutePath).size === entry.sizeBytes &&
+      hashFile(absolutePath) === entry.sha256
+    );
+  });
+}
+
+function snapshotResolutionSources(report, audioRoot) {
+  return report.items.map((item) => {
+    const relativePath = toPortablePath(item.sourceFile || "");
+    const sourcePath = path.resolve(audioRoot, relativePath);
+
+    if (
+      path.isAbsolute(relativePath) ||
+      !isPathInside(audioRoot, sourcePath) ||
+      !fs.existsSync(sourcePath) ||
+      !fs.statSync(sourcePath).isFile()
+    ) {
+      throw new PreviewBuildError("RESOLUTION_SOURCE_MISSING");
+    }
+
+    const sha256 = hashFile(sourcePath);
+    if (!SHA256_PATTERN.test(item.sha256 || "") || sha256 !== item.sha256) {
+      throw new PreviewBuildError("RESOLUTION_SOURCE_SHA256_MISMATCH");
+    }
+
+    return { relativePath, sha256 };
+  });
+}
+
 export function buildGamePreviews(options = {}) {
   const candidateFile = path.resolve(
     options.candidateFile || DEFAULT_CANDIDATE_FILE
   );
-  const candidateReport = readJsonObject(
+  const sourceReport = readJsonObject(
     candidateFile,
     "CANDIDATE_REPORT"
   );
+  const finalResolutionMode = isFinalResolutionReport(sourceReport);
+  const auditFile = path.resolve(
+    options.auditFile ||
+      (finalResolutionMode
+        ? DEFAULT_FINAL_RESOLUTION_AUDIT
+        : sourceReport?.source?.auditFile || "")
+  );
+  const audit = readJsonObject(auditFile, "SOURCE_AUDIT");
+  const candidateReport = finalResolutionMode
+    ? normalizeFinalResolutionReport(sourceReport, audit, auditFile)
+    : sourceReport;
   validateCandidateReport(candidateReport);
 
   const testRoot = options.testRoot ? path.resolve(options.testRoot) : null;
@@ -482,13 +629,15 @@ export function buildGamePreviews(options = {}) {
       )
     : validateProductionPaths(
         options.stagingRoot || DEFAULT_STAGING_ROOT,
-        options.reportFile || DEFAULT_REPORT_FILE
+        options.reportFile ||
+          (finalResolutionMode
+            ? DEFAULT_FINAL_REPORT_FILE
+            : DEFAULT_REPORT_FILE)
       );
-  const auditFile = path.resolve(
-    options.auditFile || candidateReport?.source?.auditFile || ""
-  );
-  const audit = readJsonObject(auditFile, "SOURCE_AUDIT");
   const sourceBefore = buildSourceSnapshot(audit);
+  const resolutionSourcesBefore = finalResolutionMode
+    ? snapshotResolutionSources(sourceReport, sourceBefore.audioRoot)
+    : null;
   const ffmpegCommand = options.ffmpegCommand || "ffmpeg";
   const ffprobeCommand = options.ffprobeCommand || "ffprobe";
   const ffmpegVersion = getFfmpegVersion(ffmpegCommand);
@@ -506,9 +655,22 @@ export function buildGamePreviews(options = {}) {
     throw new PreviewBuildError("M000001_PREVIEW_OUTSIDE_REPO");
   }
 
-  prepareStagingRoot(paths.stagingRoot, testRoot);
+  const existingPreviewPaths = finalResolutionMode
+    ? expectedExistingPreviewPaths()
+    : [];
+  const existingStagingBefore = finalResolutionMode
+    ? snapshotStagingFiles(paths.stagingRoot, existingPreviewPaths)
+    : null;
+
+  if (!finalResolutionMode) {
+    prepareStagingRoot(paths.stagingRoot, testRoot);
+  }
   const assets = [];
-  const expectedPaths = new Set(["M000001/preview.mp3"]);
+  const expectedPaths = new Set(
+    finalResolutionMode
+      ? existingPreviewPaths
+      : ["M000001/preview.mp3"]
+  );
   const audioRoot = sourceBefore.audioRoot;
 
   for (const candidate of candidateReport.readyForImport) {
@@ -556,16 +718,32 @@ export function buildGamePreviews(options = {}) {
     });
   }
 
-  const preservedOutput = resolveOutput(paths.stagingRoot, "M000001");
-  fs.mkdirSync(path.dirname(preservedOutput.outputPath), {
-    recursive: true
-  });
-  fs.copyFileSync(preservedPreview, preservedOutput.outputPath);
-  const preservedSourceSha256 = hashFile(preservedPreview);
-  const preservedOutputSha256 = hashFile(preservedOutput.outputPath);
+  let preserved = null;
+  if (finalResolutionMode) {
+    if (!validatePreservedStaging(paths.stagingRoot, existingStagingBefore)) {
+      throw new PreviewBuildError("EXISTING_STAGING_SHA256_MISMATCH");
+    }
+  } else {
+    const preservedOutput = resolveOutput(paths.stagingRoot, "M000001");
+    fs.mkdirSync(path.dirname(preservedOutput.outputPath), {
+      recursive: true
+    });
+    fs.copyFileSync(preservedPreview, preservedOutput.outputPath);
+    const preservedSourceSha256 = hashFile(preservedPreview);
+    const preservedOutputSha256 = hashFile(preservedOutput.outputPath);
 
-  if (preservedSourceSha256 !== preservedOutputSha256) {
-    throw new PreviewBuildError("M000001_SHA256_MISMATCH");
+    if (preservedSourceSha256 !== preservedOutputSha256) {
+      throw new PreviewBuildError("M000001_SHA256_MISMATCH");
+    }
+    preserved = {
+      songId: "M000001",
+      sourcePath: preservedPreview,
+      outputRelativePath: preservedOutput.outputRelativePath,
+      sourceSha256: preservedSourceSha256,
+      previewSha256: preservedOutputSha256,
+      sha256Preserved: true,
+      publicUrl: `${PRODUCTION_ORIGIN}/${preservedOutput.outputRelativePath}`
+    };
   }
 
   const actualPaths = enumerateStagingFiles(paths.stagingRoot);
@@ -585,6 +763,76 @@ export function buildGamePreviews(options = {}) {
   const sourceAfter = buildSourceSnapshot(audit);
   if (sourceBefore.snapshotSha256 !== sourceAfter.snapshotSha256) {
     throw new PreviewBuildError("SOURCE_AUDIO_MODIFIED");
+  }
+  const resolutionSourcesAfter = finalResolutionMode
+    ? snapshotResolutionSources(sourceReport, sourceAfter.audioRoot)
+    : null;
+  if (
+    finalResolutionMode &&
+    JSON.stringify(resolutionSourcesBefore) !==
+      JSON.stringify(resolutionSourcesAfter)
+  ) {
+    throw new PreviewBuildError("RESOLUTION_SOURCE_AUDIO_MODIFIED");
+  }
+
+  if (finalResolutionMode) {
+    const report = {
+      schemaVersion: 1,
+      source: {
+        resolutionFile: candidateFile,
+        auditFile,
+        audioRoot
+      },
+      summary: {
+        plannedCount: candidateReport.readyForImport.length,
+        builtCount: assets.length,
+        failedCount: 0,
+        preservedExistingCount: existingStagingBefore.length,
+        finalStagingCount: actualPaths.length
+      },
+      encoding: {
+        format: "mp3",
+        codec: "libmp3lame",
+        bitrate: "128k",
+        sampleRateHz: 44100,
+        channels: 2,
+        maxDurationSeconds: 30,
+        metadataStripped: true,
+        ffmpegVersion
+      },
+      safety: {
+        unresolvedSourcesChecked: resolutionSourcesAfter.length,
+        sourceAudioModified: false,
+        preservedExistingSha256: true,
+        cloudflareWrites: 0,
+        firestoreWrites: 0,
+        firebaseStorageWrites: 0
+      },
+      stagingRoot: paths.stagingRoot,
+      stagingFiles: actualPaths,
+      assets: assets.map((asset) => ({
+        songId: asset.songId,
+        songName: asset.songName,
+        artist: asset.artist,
+        sourceFile: asset.sourceRelativePath,
+        sourceSha256: asset.sourceSha256,
+        outputPath: asset.outputRelativePath,
+        outputSha256: asset.previewSha256,
+        duration: asset.previewDurationSeconds,
+        size: asset.sizeBytes,
+        previewUrl: asset.publicUrl,
+        status: "BUILT"
+      }))
+    };
+
+    fs.mkdirSync(path.dirname(paths.reportFile), { recursive: true });
+    fs.writeFileSync(
+      paths.reportFile,
+      `${JSON.stringify(report, null, 2)}\n`,
+      "utf8"
+    );
+
+    return { report, reportFile: paths.reportFile };
   }
 
   const report = {
@@ -624,15 +872,7 @@ export function buildGamePreviews(options = {}) {
       firestoreWrites: 0,
       firebaseStorageWrites: 0
     },
-    preserved: {
-      songId: "M000001",
-      sourcePath: preservedPreview,
-      outputRelativePath: preservedOutput.outputRelativePath,
-      sourceSha256: preservedSourceSha256,
-      previewSha256: preservedOutputSha256,
-      sha256Preserved: true,
-      publicUrl: `${PRODUCTION_ORIGIN}/${preservedOutput.outputRelativePath}`
-    },
+    preserved,
     validation: {
       passed: true,
       pathsUnique: expectedPaths.size === actualPaths.length,
@@ -874,6 +1114,20 @@ export function runSelfTest() {
 }
 
 function printSummary(report, reportFile) {
+  if (typeof report.summary.plannedCount === "number") {
+    console.log(`READY sources：${report.summary.plannedCount}`);
+    console.log(`New previews：${report.summary.builtCount}`);
+    console.log(
+      `Preserved previews：${report.summary.preservedExistingCount}`
+    );
+    console.log(
+      `Total staging files：${report.summary.finalStagingCount}`
+    );
+    console.log(`Failed previews：${report.summary.failedCount}`);
+    console.log(`Report：${reportFile}`);
+    return;
+  }
+
   console.log(`READY sources：${report.summary.readySourceCount}`);
   console.log(`New previews：${report.summary.newPreviewsGenerated}`);
   console.log(
