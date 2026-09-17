@@ -1,7 +1,32 @@
 import DevModeBadge from "./DevModeBadge";
 
-function getRankVisual(index) {
-  if (index === 0) {
+function getPlayerScore(player) {
+  const score = Number(player?.score);
+  return Number.isFinite(score) ? score : 0;
+}
+
+function getCompetitionRanking(players) {
+  const sortedPlayers = [...players].sort(
+    (playerA, playerB) =>
+      getPlayerScore(playerB) - getPlayerScore(playerA)
+  );
+  let previousScore = null;
+  let previousRank = 0;
+
+  return sortedPlayers.map((player, index) => {
+    const score = getPlayerScore(player);
+    const rank =
+      index === 0 || score !== previousScore ? index + 1 : previousRank;
+
+    previousScore = score;
+    previousRank = rank;
+
+    return { player, rank };
+  });
+}
+
+function getRankVisual(rank) {
+  if (rank === 1) {
     return {
       icon: "\uD83D\uDC51",
       rowClass:
@@ -11,7 +36,7 @@ function getRankVisual(index) {
     };
   }
 
-  if (index === 1) {
+  if (rank === 2) {
     return {
       icon: "\uD83E\uDD48",
       rowClass:
@@ -21,7 +46,7 @@ function getRankVisual(index) {
     };
   }
 
-  if (index === 2) {
+  if (rank === 3) {
     return {
       icon: "\uD83E\uDD49",
       rowClass:
@@ -32,7 +57,7 @@ function getRankVisual(index) {
   }
 
   return {
-    icon: `${index + 1}`,
+    icon: `${rank}`,
     rowClass: "border-[#8B2CF5]/20 bg-[#1B0D30]/70",
     iconClass: "border-[#8B2CF5]/35 bg-[#291344]/80 text-[#CFA6FF]"
   };
@@ -48,9 +73,21 @@ export default function WinnerDialog({
 }) {
   const currentPlayerName =
     window.localStorage.getItem("playerName") || "";
-  const winnerPlayer =
-    players.find((player) => player.name === winner) || players[0];
-  const winnerScore = winnerPlayer?.score ?? 0;
+  const rankedPlayers = getCompetitionRanking(players);
+  const maxScore = rankedPlayers[0]
+    ? getPlayerScore(rankedPlayers[0].player)
+    : 0;
+  const winningPlayers = rankedPlayers
+    .filter(({ player }) => getPlayerScore(player) === maxScore)
+    .map(({ player }) => player);
+  const winnerNames =
+    winningPlayers.length > 0
+      ? winningPlayers.map((player) => player.name).join("、")
+      : winner;
+  const isTiedWinner = winningPlayers.length > 1;
+  const winnerScore = winningPlayers[0]
+    ? getPlayerScore(winningPlayers[0])
+    : 0;
 
   return (
     <div className="relative min-h-[100dvh] overflow-x-hidden bg-[#07030D] text-white">
@@ -131,10 +168,10 @@ export default function WinnerDialog({
               恭喜
             </p>
             <p className="mt-2 break-words bg-[linear-gradient(180deg,#FFF6BF_0%,#FFD95A_38%,#F2B51F_72%,#C98600_100%)] bg-clip-text text-[clamp(2.25rem,10vw,2.75rem)] font-extrabold leading-tight text-transparent [text-shadow:0_0_18px_rgba(255,196,45,0.16)]">
-              {winner}
+              {winnerNames}
             </p>
             <p className="mt-2 text-[22px] font-bold">
-              獲得勝利！
+              {isTiedWinner ? "並列冠軍！" : "獲得勝利！"}
             </p>
             <div className="mx-auto mt-5 inline-flex min-h-12 items-center rounded-full border border-[#F5C542]/35 bg-black/25 px-6 text-[26px] font-extrabold text-[#FFD95A] shadow-[inset_0_1px_0_rgba(255,255,255,0.08)]">
               {winnerScore} 分
@@ -153,8 +190,8 @@ export default function WinnerDialog({
           </div>
 
           <div className="max-h-80 space-y-3 overflow-y-auto pr-1 [scrollbar-color:rgba(139,44,245,0.5)_transparent] [scrollbar-width:thin]">
-            {players.map((player, index) => {
-              const rankVisual = getRankVisual(index);
+            {rankedPlayers.map(({ player, rank }) => {
+              const rankVisual = getRankVisual(rank);
               const isCurrentPlayer =
                 player.name === currentPlayerName;
 
@@ -181,7 +218,7 @@ export default function WinnerDialog({
                       )}
                     </div>
                     <p className="mt-0.5 text-[15px] font-medium text-[#B9AFCB]">
-                      第 {index + 1} 名
+                      第 {rank} 名
                     </p>
                   </div>
 
