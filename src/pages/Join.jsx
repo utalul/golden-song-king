@@ -6,26 +6,37 @@ import {
   where,
   getDocs
 } from "firebase/firestore";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 
 import { db } from "../firebase/firebase";
 import { ensureAnonymousAuth } from "../firebase/auth";
 
 import Page from "../components/ui/Page";
+import { clearActivityMode, isValidActivityRoomId, saveActivityMode } from "../utils/activityMode";
+import {
+  classifyRoomJoinStatus,
+  getRoomJoinStatusMessage
+} from "../utils/roomJoinStatus";
 
 export default function Join() {
+  const [searchParams] = useSearchParams();
+  const roomParam = searchParams.get("room") || "";
+  const normalizedRoomParam = roomParam.replace(/\D/g, "").slice(0, 6);
+  const isActivityLink = isValidActivityRoomId(normalizedRoomParam);
   const [name, setName] = useState("");
-  const [roomId, setRoomId] = useState("");
+  const [roomId, setRoomId] = useState(normalizedRoomParam);
   const [joining, setJoining] = useState(false);
+  const [joinError, setJoinError] = useState("");
 
   const joinRoom = async () => {
     if (joining) return;
 
     setJoining(true);
+    setJoinError("");
 
     if (!name.trim() || !roomId.trim()) {
       setJoining(false);
-      alert("請輸入名稱與房號");
+      setJoinError("請輸入名稱與房號");
       return;
     }
 
@@ -36,7 +47,7 @@ export default function Join() {
     } catch (error) {
       console.error("匿名登入失敗：", error);
       setJoining(false);
-      alert("無法連線，請稍後再試");
+      setJoinError("無法連線，請稍後再試");
       return;
     }
 
@@ -49,16 +60,34 @@ export default function Join() {
 
     if (roomSnapshot.empty) {
       setJoining(false);
-      alert("房號不存在");
+      setJoinError("找不到這個活動房間，請確認 QR Code 或向主持人詢問。");
       return;
     }
 
     const roomDocument = roomSnapshot.docs[0];
+    const roomData = roomDocument.data();
 
-    if (!roomDocument.data().hostUid) {
+    if (!roomData.hostUid) {
       console.error("房間缺少主持人身分資料");
       setJoining(false);
-      alert("此房間版本過舊，請房主重新建立房間");
+      setJoinError("此舊版房間不支援活動加入，請房主重新建立房間。");
+      return;
+    }
+
+    if (!roomData.joinStatus || typeof roomData.expiresAt?.toMillis !== "function") {
+      setJoining(false);
+      setJoinError("此舊版房間不支援活動加入，請房主重新建立房間。");
+      return;
+    }
+
+    const joinStatus = classifyRoomJoinStatus(roomData);
+    const mappedMessage = joinStatus === "JOIN_ALLOWED"
+      ? null
+      : getRoomJoinStatusMessage(joinStatus);
+
+    if (joinStatus !== "JOIN_ALLOWED") {
+      setJoining(false);
+      setJoinError(mappedMessage);
       return;
     }
 
@@ -73,24 +102,33 @@ export default function Join() {
 
     if (!playerSnapshot.empty) {
       setJoining(false);
-      alert("此玩家名稱已加入房間");
+      setJoinError("此玩家名稱已加入房間");
       return;
     }
 
-    await addDoc(
-      collection(db, "players"),
-      {
-        name,
-        roomId,
-        roomDocId: roomDocument.id,
-        uid: authUser.uid,
-        score: 0,
-        isHost: false,
-        joinedAt: Date.now()
-      }
-    );
+    try {
+      await addDoc(
+        collection(db, "players"),
+        {
+          name,
+          roomId,
+          roomDocId: roomDocument.id,
+          uid: authUser.uid,
+          score: 0,
+          isHost: false,
+          joinedAt: Date.now()
+        }
+      );
+    } catch (error) {
+      console.error("加入房間失敗：", error);
+      setJoinError("房間狀態已變更，請重新掃描 QR Code 或詢問主持人。");
+      setJoining(false);
+      return;
+    }
 
     // This flag controls UI only; Firestore authorization must use Firebase Auth.
+    clearActivityMode();
+    if (isActivityLink) saveActivityMode(roomId);
     localStorage.setItem("roomId", roomId);
     localStorage.setItem("playerName", name);
     localStorage.setItem("isHost", "false");
@@ -193,7 +231,7 @@ export default function Join() {
               />
             </section>
 
-            <section className="mt-6">
+            {!isActivityLink && <section className="mt-6">
               <label
                 htmlFor="room-code"
                 className="text-base font-semibold text-white"
@@ -217,7 +255,17 @@ export default function Join() {
                 }
                 className="mt-2 h-16 w-full rounded-[16px] border border-[#A64DFF]/34 bg-[#12071E]/82 px-4 text-center text-2xl font-bold tracking-[0.16em] text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.04),inset_0_0_20px_rgba(118,34,215,0.07)] outline-none transition placeholder:text-[#8F839F] hover:border-[#A64DFF]/48 focus:border-[#FFD95A]/65 focus:shadow-[inset_0_0_18px_rgba(118,34,215,0.13),0_0_0_3px_rgba(255,217,90,0.08)]"
               />
-            </section>
+            </section>}
+            {isActivityLink && (
+              <p className="mt-6 rounded-xl border border-[#A64DFF]/25 bg-[#12071E]/65 px-4 py-3 text-center text-sm text-[#B8AEC8]">
+                活動房號：<span className="font-bold tracking-widest text-[#FFE58A]">{roomId}</span>
+              </p>
+            )}
+            {joinError && (
+              <p role="alert" className="mt-4 rounded-xl border border-red-400/30 bg-red-950/30 px-4 py-3 text-sm font-semibold text-red-200">
+                {joinError}
+              </p>
+            )}
           </main>
 
           <div className="mt-auto pt-8">

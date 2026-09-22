@@ -1,9 +1,12 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 
 import Page from "../components/ui/Page";
 
+import { clearActivityMode } from "../utils/activityMode";
+
 export default function Home() {
+  useEffect(() => clearActivityMode(), []);
   const [instructionsOpen, setInstructionsOpen] =
     useState(false);
 

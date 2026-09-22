@@ -32,6 +32,8 @@ import LoadingCard from "../components/game/LoadingCard";
 import AudioPlayer from "../components/game/AudioPlayer";
 import { DEV_MODE } from "../constants/game";
 import { GAME_PHASES } from "../constants/gamePhases";
+import useFullscreen from "../hooks/useFullscreen";
+import { clearActivityMode, getActivityMode, isIosBrowser, isStandaloneMode } from "../utils/activityMode";
 import {
   GAME_CONFIG,
   SONG_COLLECTION
@@ -93,7 +95,6 @@ export default function Game() {
 
   const isHost =
     localStorage.getItem("isHost") === "true";
-
   const nextQuestionTimerRef =
     useRef(null);
 
@@ -142,6 +143,15 @@ export default function Game() {
   const gamePhase =
     roomData?.gamePhase ||
     GAME_PHASES.PLAYING;
+
+  const isActivityMode = !isHost && roomData?.joinStatus !== "ENDED" && getActivityMode(roomId);
+  const isStandalone = isStandaloneMode();
+  const showIosInstallTip = isActivityMode && isIosBrowser() && !isStandalone;
+  const { isSupported, isFullscreen, enterFullscreen, error: fullscreenError } = useFullscreen();
+
+  useEffect(() => {
+    if (roomData?.joinStatus === "ENDED") clearActivityMode();
+  }, [roomData?.joinStatus]);
 
   const isPlayingPhase =
     gamePhase === GAME_PHASES.PLAYING;
@@ -206,7 +216,7 @@ export default function Game() {
     setTimeLeft(
       getPhaseTime(phase)
     );
-  }, []);
+  }, [setTimeLeft]);
 
   const fetchSongQueue = useCallback(async () => {
     const songsRef =
@@ -780,7 +790,9 @@ export default function Game() {
     authorizeHost,
     resetPhaseTimer,
     roomData,
-    roomDocId
+    roomDocId,
+    setAnswer,
+    setSubmitted
   ]);
 
   const advanceToAnswering = useCallback(async () => {
@@ -1309,6 +1321,17 @@ export default function Game() {
           <div className="mt-2">
             <DevModeBadge enabled={DEV_MODE} />
           </div>
+
+          {isActivityMode && !isHost && !isFullscreen && (
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <button type="button" onClick={enterFullscreen} className="min-h-10 rounded-full border border-[#FFD95A]/35 bg-[#21152B]/90 px-4 text-sm font-bold text-[#FFE58A] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#FFD95A]">
+                全螢幕
+              </button>
+              {fullscreenError && <span role="status" className="text-xs text-[#FFE58A]">{fullscreenError}</span>}
+              {showIosInstallTip && <span className="text-xs text-[#B8AEC8]">可從 Safari 分享選單選擇「加入主畫面」，以 standalone 模式開啟。</span>}
+              {!isSupported && !fullscreenError && <span className="text-xs text-[#B8AEC8]">你的瀏覽器無法自動進入全螢幕，仍可繼續遊戲。</span>}
+            </div>
+          )}
 
           <main className="flex flex-1 flex-col">
             {!isRevealPhase && (

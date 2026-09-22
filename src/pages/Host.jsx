@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { collection, addDoc } from "firebase/firestore";
+import { collection, addDoc, Timestamp } from "firebase/firestore";
 import { Link } from "react-router-dom";
 
 import { db } from "../firebase/firebase";
 import { ensureAnonymousAuth } from "../firebase/auth";
 
 import Page from "../components/ui/Page";
+import { clearActivityMode } from "../utils/activityMode";
 
 export default function Host() {
   const [hostName, setHostName] = useState("");
@@ -21,6 +22,7 @@ export default function Host() {
   ];
 
   const createRoom = async () => {
+    clearActivityMode();
     if (!hostName.trim()) {
       alert("請輸入房主名稱");
       return;
@@ -63,6 +65,12 @@ export default function Host() {
     category,
 
     status: "waiting",
+
+    joinStatus: "OPEN",
+
+    expiresAt: Timestamp.fromMillis(
+      Date.now() + 6 * 60 * 60 * 1000
+    ),
 
         gameRound: 1,
 

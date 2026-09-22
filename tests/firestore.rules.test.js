@@ -14,6 +14,7 @@ import {
   getDocs,
   query,
   setDoc,
+  Timestamp,
   updateDoc,
   where
 } from "firebase/firestore";
@@ -42,6 +43,8 @@ function roomData(overrides = {}) {
     scored: false,
     winner: "",
     createdAt: NOW,
+    joinStatus: "OPEN",
+    expiresAt: Timestamp.fromMillis(Date.now() + 6 * 60 * 60 * 1000),
     ...overrides
   };
 }
@@ -155,6 +158,7 @@ test("host can update their room game state", async () => {
   await assertSucceeds(
     updateDoc(doc(firestoreFor(HOST_UID), "rooms", ROOM_DOC_ID), {
       status: "playing",
+      joinStatus: "LOCKED",
       currentMode: "artist",
       currentSongId: "M000001",
       songQueue: ["M000002"],
@@ -162,6 +166,103 @@ test("host can update their room game state", async () => {
       phaseStartedAt: NOW + 1
     })
   );
+});
+
+test("student can join an OPEN waiting room before expiry", async () => {
+  await seedDocuments((db) => setDoc(doc(db, "rooms", ROOM_DOC_ID), roomData()));
+  await assertSucceeds(setDoc(doc(firestoreFor(PLAYER_UID), "players", "open-player"), playerData()));
+});
+
+test("unauthenticated player create is denied", async () => {
+  await seedDocuments((db) => setDoc(doc(db, "rooms", ROOM_DOC_ID), roomData()));
+  await assertFails(setDoc(doc(testEnvironment.unauthenticatedContext().firestore(), "players", "anonymous-player"), playerData()));
+});
+
+for (const [label, overrides] of [
+  ["LOCKED", { joinStatus: "LOCKED" }],
+  ["ENDED", { joinStatus: "ENDED" }],
+  ["expired", { expiresAt: Timestamp.fromMillis(Date.now() - 1000) }],
+  ["playing", { status: "playing" }]
+]) {
+  test(`student cannot join ${label} room`, async () => {
+    await seedDocuments((db) => setDoc(doc(db, "rooms", ROOM_DOC_ID), roomData(overrides)));
+    await assertFails(setDoc(doc(firestoreFor(PLAYER_UID), "players", `blocked-${label}`), playerData()));
+  });
+}
+
+test("host can lock and unlock while waiting", async () => {
+  await seedDocuments((db) => setDoc(doc(db, "rooms", ROOM_DOC_ID), roomData()));
+  const ref = doc(firestoreFor(HOST_UID), "rooms", ROOM_DOC_ID);
+  await assertSucceeds(updateDoc(ref, { joinStatus: "LOCKED" }));
+  await assertSucceeds(updateDoc(ref, { joinStatus: "OPEN" }));
+});
+
+test("non-host cannot change joinStatus", async () => {
+  await seedDocuments((db) => setDoc(doc(db, "rooms", ROOM_DOC_ID), roomData()));
+  await assertFails(updateDoc(doc(firestoreFor(PLAYER_UID), "rooms", ROOM_DOC_ID), { joinStatus: "LOCKED" }));
+});
+
+test("host cannot unlock once game has started", async () => {
+  await seedDocuments((db) => setDoc(doc(db, "rooms", ROOM_DOC_ID), roomData({ status: "playing", joinStatus: "LOCKED" })));
+  await assertFails(updateDoc(doc(firestoreFor(HOST_UID), "rooms", ROOM_DOC_ID), { joinStatus: "OPEN" }));
+});
+
+test("host can atomically start game and lock joins", async () => {
+  await seedDocuments((db) => setDoc(doc(db, "rooms", ROOM_DOC_ID), roomData()));
+  await assertSucceeds(updateDoc(doc(firestoreFor(HOST_UID), "rooms", ROOM_DOC_ID), { status: "playing", joinStatus: "LOCKED" }));
+});
+
+test("host cannot start an expired lifecycle room", async () => {
+  await seedDocuments((db) => setDoc(doc(db, "rooms", ROOM_DOC_ID), roomData({ expiresAt: Timestamp.fromMillis(Date.now() - 1000) })));
+  await assertFails(updateDoc(doc(firestoreFor(HOST_UID), "rooms", ROOM_DOC_ID), { status: "playing", joinStatus: "LOCKED" }));
+});
+
+test("host can end a waiting room", async () => {
+  await seedDocuments((db) => setDoc(doc(db, "rooms", ROOM_DOC_ID), roomData()));
+  await assertSucceeds(updateDoc(doc(firestoreFor(HOST_UID), "rooms", ROOM_DOC_ID), { joinStatus: "ENDED" }));
+});
+
+test("host cannot end a playing room in Sprint29B", async () => {
+  await seedDocuments((db) => setDoc(doc(db, "rooms", ROOM_DOC_ID), roomData({ status: "playing", joinStatus: "LOCKED" })));
+  await assertFails(updateDoc(doc(firestoreFor(HOST_UID), "rooms", ROOM_DOC_ID), { joinStatus: "ENDED" }));
+});
+
+test("student cannot change room expiry or host identity", async () => {
+  await seedDocuments((db) => setDoc(doc(db, "rooms", ROOM_DOC_ID), roomData()));
+  const ref = doc(firestoreFor(PLAYER_UID), "rooms", ROOM_DOC_ID);
+  await assertFails(updateDoc(ref, { expiresAt: Timestamp.fromMillis(Date.now() + 24 * 60 * 60 * 1000) }));
+  await assertFails(updateDoc(ref, { hostUid: PLAYER_UID }));
+});
+
+test("host cannot extend room expiry in Sprint29B", async () => {
+  await seedDocuments((db) => setDoc(doc(db, "rooms", ROOM_DOC_ID), roomData()));
+  await assertFails(updateDoc(doc(firestoreFor(HOST_UID), "rooms", ROOM_DOC_ID), { expiresAt: Timestamp.fromMillis(Date.now() + 24 * 60 * 60 * 1000) }));
+});
+
+test("locking room does not remove existing players", async () => {
+  await seedDocuments(async (db) => {
+    await setDoc(doc(db, "rooms", ROOM_DOC_ID), roomData());
+    await setDoc(doc(db, "players", "existing-player"), playerData());
+  });
+  await assertSucceeds(updateDoc(doc(firestoreFor(HOST_UID), "rooms", ROOM_DOC_ID), { joinStatus: "LOCKED" }));
+  await assertSucceeds(getDoc(doc(firestoreFor(PLAYER_UID), "players", "existing-player")));
+});
+
+test("room creation requires valid lifecycle fields", async () => {
+  const missing = roomData();
+  delete missing.joinStatus;
+  delete missing.expiresAt;
+  await assertFails(setDoc(doc(firestoreFor(HOST_UID), "rooms", "missing-lifecycle"), missing));
+  await assertFails(setDoc(doc(firestoreFor(HOST_UID), "rooms", "malformed-lifecycle"), roomData({ joinStatus: "OPEN", expiresAt: "later" })));
+});
+
+test("legacy room game updates remain compatible but new joins fail closed", async () => {
+  const legacy = roomData();
+  delete legacy.joinStatus;
+  delete legacy.expiresAt;
+  await seedDocuments((db) => setDoc(doc(db, "rooms", ROOM_DOC_ID), legacy));
+  await assertSucceeds(updateDoc(doc(firestoreFor(HOST_UID), "rooms", ROOM_DOC_ID), { status: "playing" }));
+  await assertFails(setDoc(doc(firestoreFor(PLAYER_UID), "players", "legacy-join"), playerData()));
 });
 
 test("non-host cannot update a room", async () => {

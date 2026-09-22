@@ -7,6 +7,7 @@ import {
   updateDoc,
   doc
 } from "firebase/firestore";
+import { QRCodeSVG } from "qrcode.react";
 
 import { useNavigate } from "react-router-dom";
 import { db } from "../firebase/firebase";
@@ -15,6 +16,8 @@ import { ensureAnonymousAuth } from "../firebase/auth";
 import Page from "../components/ui/Page";
 import { GAME_MODE_LABELS, CATEGORY_LABELS } from "../constants/gameMode";
 import { getRandomSong } from "../services/songService";
+import useFullscreen from "../hooks/useFullscreen";
+import { clearActivityMode, getActivityMode, isIosBrowser, isStandaloneMode } from "../utils/activityMode";
 
 export default function Lobby() {
   const navigate = useNavigate();
@@ -27,18 +30,46 @@ export default function Lobby() {
 
   const isHost =
     localStorage.getItem("isHost") === "true";
-
   const [players, setPlayers] =
     useState([]);
 
   const [roomData, setRoomData] =
     useState(null);
 
+  const isActivityMode = !isHost && roomData?.joinStatus !== "ENDED" && getActivityMode(roomId);
+  const isStandalone = isStandaloneMode();
+  const showIosInstallTip = isActivityMode && isIosBrowser() && !isStandalone;
+  const { isFullscreen, enterFullscreen, error: fullscreenError } = useFullscreen();
+
   const [roomDocId, setRoomDocId] =
     useState("");
 
   const [copied, setCopied] =
     useState(false);
+
+  const [verifiedHost, setVerifiedHost] = useState(false);
+  const [lifecycleBusy, setLifecycleBusy] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    async function verifyHost() {
+      try {
+        const authUser = await ensureAnonymousAuth();
+        if (active) setVerifiedHost(Boolean(roomData?.hostUid && authUser.uid === roomData.hostUid));
+      } catch (error) {
+        console.error("主持人身分驗證失敗：", error);
+        if (active) setVerifiedHost(false);
+      }
+    }
+    verifyHost();
+    return () => { active = false; };
+  }, [roomData?.hostUid]);
+
+  useEffect(() => {
+    if (roomData?.joinStatus === "ENDED") {
+      clearActivityMode();
+    }
+  }, [roomData?.joinStatus]);
 
   useEffect(() => {
     if (!roomId) return;
@@ -108,6 +139,8 @@ export default function Lobby() {
 
   const startGame = async () => {
   if (!roomDocId || !roomData) return;
+  if (roomData.joinStatus === "ENDED") return;
+  if (roomData.expiresAt?.toMillis && roomData.expiresAt.toMillis() <= Date.now()) return;
 
   let authUser;
 
@@ -143,13 +176,7 @@ if (!randomSong) return;
       )
     ];
 
-  await updateDoc(
-    doc(
-      db,
-      "rooms",
-      roomDocId
-    ),
-    {
+  const startUpdate = {
       status: "playing",
 
       currentQuestion: 1,
@@ -164,9 +191,53 @@ if (!randomSong) return;
         false,
 
       scored: false
-    }
+    };
+
+  if (roomData.joinStatus) {
+    startUpdate.joinStatus = "LOCKED";
+  }
+
+  await updateDoc(
+    doc(db, "rooms", roomDocId),
+    startUpdate
   );
 };
+
+  const updateJoinStatus = async (nextStatus) => {
+    if (!verifiedHost || !roomDocId || !roomData || lifecycleBusy || roomData.status !== "waiting") return;
+    setLifecycleBusy(true);
+    try {
+      const authUser = await ensureAnonymousAuth();
+      if (authUser.uid !== roomData.hostUid) return;
+      await updateDoc(doc(db, "rooms", roomDocId), { joinStatus: nextStatus });
+    } catch (error) {
+      console.error("更新房間狀態失敗：", error);
+    } finally {
+      setLifecycleBusy(false);
+    }
+  };
+
+  const endRoom = async () => {
+    // Ending active gameplay requires a separate Game flow; v1 only ends waiting rooms.
+    if (!verifiedHost || !roomDocId || !roomData || lifecycleBusy || roomData.status !== "waiting") return;
+    setLifecycleBusy(true);
+    try {
+      const authUser = await ensureAnonymousAuth();
+      if (authUser.uid !== roomData.hostUid) return;
+      await updateDoc(doc(db, "rooms", roomDocId), { joinStatus: "ENDED" });
+    } catch (error) {
+      console.error("結束房間失敗：", error);
+    } finally {
+      setLifecycleBusy(false);
+    }
+  };
+
+  const leaveLobby = () => {
+    clearActivityMode();
+    navigate("/");
+  };
+
+  const joinUrl = `${window.location.origin}/join?room=${encodeURIComponent(roomId)}`;
 
   const copyRoomId = async () => {
     if (!roomId) return;
@@ -197,7 +268,7 @@ if (!randomSong) return;
       await navigator.share({
         title: "金曲猜歌王",
         text: `加入房間 ${roomId}，一起來猜歌！`,
-        url: `${window.location.origin}/join`
+        url: joinUrl
       });
     } catch (error) {
       if (error.name !== "AbortError") {
@@ -257,7 +328,7 @@ if (!randomSong) return;
           <header className="grid grid-cols-[1fr_auto_1fr] items-start gap-3">
             <button
               type="button"
-              onClick={() => navigate("/")}
+              onClick={leaveLobby}
               className="flex min-h-10 items-center justify-self-start rounded-full px-2 text-sm font-bold text-[#B8AEC8] transition hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#FFD95A] active:translate-y-px"
             >
               ← 離開
@@ -328,6 +399,28 @@ if (!randomSong) return;
                 </button>
               </div>
             </section>
+
+            {verifiedHost && (
+              <section className="mt-3 rounded-[18px] border border-[#A64DFF]/25 bg-[#12071E]/75 p-4 text-center">
+                <h2 className="text-base font-bold text-white">活動加入</h2>
+                <div className="mx-auto mt-3 inline-flex rounded-xl bg-white p-2">
+                  <QRCodeSVG value={joinUrl} size={144} level="M" includeMargin />
+                </div>
+                <p className="mt-2 text-sm font-semibold text-[#B8AEC8]">掃描 QR Code 加入遊戲</p>
+                <p className="mt-2 text-sm text-[#8F839F]">
+                  狀態：{roomData?.joinStatus === "OPEN" ? "開放加入" : roomData?.joinStatus === "LOCKED" ? "已鎖定" : roomData?.joinStatus === "ENDED" ? "已結束" : "舊版房間"}
+                </p>
+                {roomData?.joinStatus === "OPEN" && roomData?.status === "waiting" && (
+                  <button type="button" disabled={lifecycleBusy} onClick={() => updateJoinStatus("LOCKED")} className="mt-3 min-h-11 rounded-full border border-[#FFD95A]/35 px-5 font-bold text-[#FFE58A] disabled:opacity-50">鎖定房間</button>
+                )}
+                {roomData?.joinStatus === "LOCKED" && roomData?.status === "waiting" && (
+                  <button type="button" disabled={lifecycleBusy} onClick={() => updateJoinStatus("OPEN")} className="mt-3 min-h-11 rounded-full border border-[#A64DFF]/45 px-5 font-bold text-white disabled:opacity-50">解除鎖定</button>
+                )}
+                {roomData?.status === "waiting" && roomData?.joinStatus !== "ENDED" && (
+                  <button type="button" disabled={lifecycleBusy} onClick={endRoom} className="ml-2 mt-3 min-h-11 rounded-full border border-red-400/35 px-5 font-bold text-red-200 disabled:opacity-50">結束房間</button>
+                )}
+              </section>
+            )}
 
             <section className="mt-3 flex items-center gap-3 rounded-[16px] border border-[#FFD95A]/16 bg-[#12071E]/72 px-4 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
               <div className="flex size-11 shrink-0 items-center justify-center rounded-full border border-[#FFD95A]/28 bg-[#FFD95A]/8 text-xl shadow-[inset_0_0_12px_rgba(255,205,70,0.08)]">
@@ -439,14 +532,31 @@ if (!randomSong) return;
           </main>
 
           <div className="mt-auto pt-4">
+            {isActivityMode && !isHost && (
+              <section className="mb-3 rounded-2xl border border-[#FFD95A]/30 bg-[#21152B]/90 p-4 text-center">
+                <button
+                  type="button"
+                  onClick={enterFullscreen}
+                  disabled={isFullscreen}
+                  className="min-h-12 w-full rounded-full bg-[linear-gradient(180deg,#FFD957,#C88300)] px-5 font-extrabold text-[#211020] focus-visible:outline-2 focus-visible:outline-offset-3 focus-visible:outline-[#FFF3A6] disabled:cursor-default disabled:opacity-70"
+                >
+                  {isFullscreen ? "已進入全螢幕" : "進入全螢幕遊戲"}
+                </button>
+                {fullscreenError && <p role="status" className="mt-2 text-sm text-[#FFE58A]">{fullscreenError}</p>}
+                {showIosInstallTip && (
+                  <p className="mt-2 text-sm text-[#D8CBE6]">若希望遊戲時不顯示瀏覽器網址列，可將「金曲猜歌王」加入主畫面後開啟。使用 Safari 分享選單中的「加入主畫面」即可。</p>
+                )}
+              </section>
+            )}
             {isHost ? (
               <button
                 type="button"
+                disabled={roomData?.joinStatus === "ENDED"}
                 onClick={startGame}
-                className="flex h-[68px] w-full items-center justify-center gap-2 rounded-[18px] border border-[#FFE58A]/55 bg-[linear-gradient(180deg,#FFD957_0%,#EFB01A_55%,#C88300_100%)] text-xl font-extrabold text-[#211020] shadow-[inset_0_1px_0_rgba(255,255,255,0.35),inset_0_-2px_0_rgba(112,61,0,0.24),0_8px_24px_rgba(230,160,0,0.22)] transition hover:-translate-y-0.5 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.42),0_11px_28px_rgba(230,160,0,0.3)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#FFF3A6] active:translate-y-px active:scale-[0.99]"
+                className="flex h-[68px] w-full items-center justify-center gap-2 rounded-[18px] border border-[#FFE58A]/55 bg-[linear-gradient(180deg,#FFD957_0%,#EFB01A_55%,#C88300_100%)] text-xl font-extrabold text-[#211020] shadow-[inset_0_1px_0_rgba(255,255,255,0.35),inset_0_-2px_0_rgba(112,61,0,0.24),0_8px_24px_rgba(230,160,0,0.22)] transition hover:-translate-y-0.5 hover:shadow-[inset_0_1px_0_rgba(255,255,255,0.42),0_11px_28px_rgba(230,160,0,0.3)] focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-[#FFF3A6] active:translate-y-px active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
               >
                 <span aria-hidden="true">▶</span>
-                開始遊戲
+                {roomData?.joinStatus === "ENDED" ? "活動已結束" : "開始遊戲"}
               </button>
             ) : (
               <div className="flex h-[68px] items-center justify-center gap-2 rounded-[18px] border border-[#A64DFF]/22 bg-[#12071E]/72 text-sm font-bold text-[#D7A4FF] shadow-[inset_0_0_20px_rgba(118,34,215,0.08)]">

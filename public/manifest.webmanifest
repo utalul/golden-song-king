@@ -1,0 +1,17 @@
+{
+  "id": "/",
+  "name": "金曲猜歌王",
+  "short_name": "猜歌王",
+  "lang": "zh-TW",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "theme_color": "#12051F",
+  "background_color": "#07030D",
+  "icons": [
+    { "src": "/icons/app-icon-192.svg", "sizes": "192x192", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/icons/app-icon-512.svg", "sizes": "512x512", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/icons/app-icon-maskable.svg", "sizes": "512x512", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}

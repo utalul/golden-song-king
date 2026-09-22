@@ -38,7 +38,9 @@ service cloud.firestore {
         'answerRevealed',
         'scored',
         'winner',
-        'createdAt'
+        'createdAt',
+        'joinStatus',
+        'expiresAt'
       ]);
     }
 
@@ -97,12 +99,21 @@ service cloud.firestore {
         && (!('gamePhase' in data)
           || data.gamePhase in ['PLAYING', 'ANSWERING', 'REVEAL'])
         && (!('phaseStartedAt' in data)
-          || (data.phaseStartedAt is int && data.phaseStartedAt > 0));
+          || (data.phaseStartedAt is int && data.phaseStartedAt > 0))
+        && (!('joinStatus' in data)
+          || data.joinStatus in ['OPEN', 'LOCKED', 'ENDED'])
+        && (!('expiresAt' in data)
+          || data.expiresAt is timestamp);
     }
 
     function isValidRoomCreate() {
       return hasValidRoomData(request.resource.data)
         && request.resource.data.hostUid == request.auth.uid
+        && request.resource.data.keys().hasAll(['joinStatus', 'expiresAt'])
+        && request.resource.data.joinStatus == 'OPEN'
+        && request.resource.data.expiresAt is timestamp
+        && request.time < request.resource.data.expiresAt
+        && request.resource.data.expiresAt <= request.time + duration.value(6, 'h')
         && request.resource.data.status == 'waiting'
         && request.resource.data.gameRound == 1
         && request.resource.data.currentQuestion == 1
@@ -118,6 +129,10 @@ service cloud.firestore {
         && request.resource.data.hostName == resource.data.hostName
         && request.resource.data.category == resource.data.category
         && request.resource.data.createdAt == resource.data.createdAt
+        && (('expiresAt' in request.resource.data)
+          == ('expiresAt' in resource.data))
+        && (!('expiresAt' in resource.data)
+          || request.resource.data.expiresAt == resource.data.expiresAt)
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'status',
           'gameRound',
@@ -128,10 +143,32 @@ service cloud.firestore {
           'songQueue',
           'gamePhase',
           'phaseStartedAt',
+          'joinStatus',
           'answerRevealed',
           'scored',
           'winner'
-        ]);
+        ])
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['joinStatus'])
+          || validJoinStatusTransition(resource.data, request.resource.data))
+        && (resource.data.status != 'waiting'
+          || request.resource.data.status != 'playing'
+          || !('joinStatus' in resource.data)
+          || (request.time < resource.data.expiresAt
+            && request.resource.data.joinStatus == 'LOCKED'));
+    }
+
+    function validJoinStatusTransition(before, after) {
+      return (before.joinStatus == 'OPEN'
+          && after.joinStatus == 'LOCKED'
+          && (after.status == 'waiting' || after.status == 'playing'))
+        || (before.joinStatus == 'LOCKED'
+          && after.joinStatus == 'OPEN'
+          && before.status == 'waiting'
+          && after.status == 'waiting')
+        || ((before.joinStatus == 'OPEN' || before.joinStatus == 'LOCKED')
+          && after.joinStatus == 'ENDED'
+          && before.status == 'waiting'
+          && after.status == 'waiting');
     }
 
     function hasOnlyPlayerFields(data) {
@@ -180,6 +217,10 @@ service cloud.firestore {
         && request.resource.data.score == 0
         && roomExists(request.resource.data.roomDocId)
         && request.resource.data.roomId == room.data.roomId
+        && room.data.status == 'waiting'
+        && room.data.joinStatus == 'OPEN'
+        && room.data.expiresAt is timestamp
+        && request.time < room.data.expiresAt
         && (request.resource.data.isHost == false
           || request.auth.uid == room.data.hostUid);
     }
