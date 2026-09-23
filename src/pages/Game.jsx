@@ -38,11 +38,7 @@ import {
   GAME_CONFIG,
   SONG_COLLECTION
 } from "../config/gameConfig";
-
-const MODES = [
-  "songName",
-  "artist"
-];
+import { getQuestionMode } from "../constants/gameMode";
 
 const REVEAL_TIME = 5;
 
@@ -64,14 +60,6 @@ function shuffleSongs(songs) {
   }
 
   return shuffledSongs;
-}
-
-function getRandomMode() {
-  return MODES[
-    Math.floor(
-      Math.random() * MODES.length
-    )
-  ];
 }
 
 function getPhaseTime(gamePhase) {
@@ -253,7 +241,7 @@ export default function Game() {
     return shuffleSongs(songs);
   }, []);
 
-  const createQuestionState = useCallback((songQueue) => {
+  const createQuestionState = useCallback((songQueue, gameMode) => {
     const nextSong =
       songQueue.shift();
 
@@ -263,7 +251,7 @@ export default function Game() {
 
     return {
       currentSongId: nextSong.id,
-      currentMode: getRandomMode(),
+      currentMode: getQuestionMode(gameMode),
       songQueue: songQueue.map(
         (queueSong) => queueSong.id
       ),
@@ -393,7 +381,7 @@ export default function Game() {
         await fetchSongQueue();
 
       const questionState =
-        createQuestionState(songQueue);
+        createQuestionState(songQueue, roomData.gameMode);
 
       if (!questionState)
         return;
@@ -766,7 +754,7 @@ export default function Game() {
           nextSongId,
 
         currentMode:
-          getRandomMode(),
+          getQuestionMode(roomData.gameMode),
 
         songQueue,
 
@@ -988,7 +976,7 @@ export default function Game() {
       await fetchSongQueue();
 
     const questionState =
-      createQuestionState(songQueue);
+    createQuestionState(songQueue, roomData.gameMode);
 
     if (!questionState)
       return;

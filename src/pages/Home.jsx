@@ -210,7 +210,7 @@ export default function Home() {
               </p>
 
               <p className="mt-1 text-sm text-[#B8AEC8]">
-                猜歌名・猜歌手・歌詞接唱
+                猜歌名・猜歌手・隨機模式
               </p>
             </section>
 

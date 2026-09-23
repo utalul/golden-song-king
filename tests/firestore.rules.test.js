@@ -141,6 +141,44 @@ test("host can create a room with their own uid", async () => {
   );
 });
 
+for (const gameMode of ["songName", "artist", "random"]) {
+  test(`host can create a ${gameMode} room mode`, async () => {
+    await assertSucceeds(
+      setDoc(
+        doc(firestoreFor(HOST_UID), "rooms", `${ROOM_DOC_ID}-${gameMode}`),
+        roomData({ gameMode })
+      )
+    );
+  });
+}
+
+test("new rooms cannot create lyric mode", async () => {
+  await assertFails(
+    setDoc(
+      doc(firestoreFor(HOST_UID), "rooms", `${ROOM_DOC_ID}-lyric`),
+      roomData({ gameMode: "lyric" })
+    )
+  );
+});
+
+test("legacy lyric rooms can retain their mode without migration", async () => {
+  await seedDocuments((db) =>
+    setDoc(doc(db, "rooms", ROOM_DOC_ID), roomData({ gameMode: "lyric" }))
+  );
+
+  await assertSucceeds(
+    updateDoc(doc(firestoreFor(HOST_UID), "rooms", ROOM_DOC_ID), {
+      status: "playing",
+      joinStatus: "LOCKED",
+      currentMode: "artist",
+      currentSongId: "M000001",
+      songQueue: ["M000002"],
+      gamePhase: "PLAYING",
+      phaseStartedAt: NOW + 1
+    })
+  );
+});
+
 test("room create rejects a fake host uid", async () => {
   await assertFails(
     setDoc(

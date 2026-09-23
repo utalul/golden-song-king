@@ -14,7 +14,7 @@ import { db } from "../firebase/firebase";
 import { ensureAnonymousAuth } from "../firebase/auth";
 
 import Page from "../components/ui/Page";
-import { GAME_MODE_LABELS, CATEGORY_LABELS } from "../constants/gameMode";
+import { GAME_MODE_LABELS, CATEGORY_LABELS, getEffectiveGameMode, getQuestionMode } from "../constants/gameMode";
 import { getRandomSong } from "../services/songService";
 import useFullscreen from "../hooks/useFullscreen";
 import { clearActivityMode, getActivityMode, isIosBrowser, isStandaloneMode } from "../utils/activityMode";
@@ -163,19 +163,6 @@ export default function Lobby() {
 
 if (!randomSong) return;
 
-  const modes = [
-    "songName",
-    "artist"
-  ];
-
-  const randomMode =
-    modes[
-      Math.floor(
-        Math.random() *
-          modes.length
-      )
-    ];
-
   const startUpdate = {
       status: "playing",
 
@@ -185,7 +172,7 @@ if (!randomSong) return;
         randomSong.id,
 
       currentMode:
-        randomMode,
+        getQuestionMode(roomData.gameMode),
 
       answerRevealed:
         false,
@@ -515,7 +502,7 @@ if (!randomSong) return;
                 </div>
 
                 <div className="mt-0.5 truncate text-lg font-bold text-white">
-                  {GAME_MODE_LABELS[roomData?.gameMode] || "等待中..."}
+                  {GAME_MODE_LABELS[getEffectiveGameMode(roomData?.gameMode)]}
                 </div>
               </div>
 

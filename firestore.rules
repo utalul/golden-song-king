@@ -84,7 +84,7 @@ service cloud.firestore {
         && data.gameRound >= 1
         && data.currentQuestion is int
         && data.currentQuestion >= 1
-        && data.gameMode in ['songName', 'artist', 'lyric']
+        && data.gameMode in ['songName', 'artist', 'random', 'lyric']
         && data.answerRevealed is bool
         && data.scored is bool
         && data.winner is string
@@ -108,6 +108,7 @@ service cloud.firestore {
 
     function isValidRoomCreate() {
       return hasValidRoomData(request.resource.data)
+        && request.resource.data.gameMode in ['songName', 'artist', 'random']
         && request.resource.data.hostUid == request.auth.uid
         && request.resource.data.keys().hasAll(['joinStatus', 'expiresAt'])
         && request.resource.data.joinStatus == 'OPEN'
@@ -124,6 +125,8 @@ service cloud.firestore {
 
     function isValidRoomUpdate() {
       return hasValidRoomData(request.resource.data)
+        && (request.resource.data.gameMode in ['songName', 'artist', 'random']
+          || (resource.data.gameMode == 'lyric' && request.resource.data.gameMode == 'lyric'))
         && request.resource.data.hostUid == resource.data.hostUid
         && request.resource.data.roomId == resource.data.roomId
         && request.resource.data.hostName == resource.data.hostName

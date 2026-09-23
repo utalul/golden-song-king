@@ -7,10 +7,18 @@ import { ensureAnonymousAuth } from "../firebase/auth";
 
 import Page from "../components/ui/Page";
 import { clearActivityMode } from "../utils/activityMode";
+import { GAME_MODE_LABELS, PLAYABLE_GAME_MODES } from "../constants/gameMode";
 
 export default function Host() {
   const [hostName, setHostName] = useState("");
   const [category, setCategory] = useState("all");
+  const [gameMode, setGameMode] = useState(PLAYABLE_GAME_MODES.RANDOM);
+
+  const gameModes = [
+    { value: PLAYABLE_GAME_MODES.SONG_NAME, label: GAME_MODE_LABELS.songName },
+    { value: PLAYABLE_GAME_MODES.ARTIST, label: GAME_MODE_LABELS.artist },
+    { value: PLAYABLE_GAME_MODES.RANDOM, label: GAME_MODE_LABELS.random },
+  ];
 
   const categories = [
     { value: "all", label: "🎵 全部歌曲" },
@@ -42,19 +50,6 @@ export default function Host() {
       100000 + Math.random() * 900000
     ).toString();
 
-    const modes = [
-      "songName",
-      "artist",
-      "lyric"
-    ];
-
-    const randomMode =
-      modes[
-        Math.floor(
-          Math.random() * modes.length
-        )
-      ];
-
     const roomRef = await addDoc(
   collection(db, "rooms"),
   {
@@ -76,7 +71,7 @@ export default function Host() {
 
         currentQuestion: 1,
 
-        gameMode: randomMode,
+        gameMode,
 
         answerRevealed: false,
 
@@ -225,13 +220,19 @@ export default function Host() {
                 遊戲模式
               </div>
 
-              <div className="mt-2 text-[21px] font-extrabold text-white">
-                🎲 經典隨機模式
+              <div className="mt-2 grid grid-cols-3 gap-2">
+                {gameModes.map((item) => (
+                  <button
+                    key={item.value}
+                    type="button"
+                    aria-pressed={gameMode === item.value}
+                    onClick={() => setGameMode(item.value)}
+                    className={`min-h-[66px] rounded-[14px] border px-2 py-2 text-sm font-extrabold transition ${gameMode === item.value ? "border-[#FFE58A] bg-[linear-gradient(180deg,#A848FF,#6719C5)] text-white shadow-[0_0_0_2px_rgba(255,217,90,0.2)]" : "border-[#A64DFF]/25 bg-[#12071E]/70 text-[#B8AEC8] hover:border-[#C77DFF]/55"}`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
               </div>
-
-              <p className="mt-1 text-sm text-[#8F839F]">
-                歌名、歌手與歌詞題型隨機出現
-              </p>
             </section>
 
             <section className="mt-4">
