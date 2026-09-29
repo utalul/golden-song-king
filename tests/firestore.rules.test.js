@@ -65,6 +65,7 @@ function playerData(overrides = {}) {
 function answerData(overrides = {}) {
   return {
     roomId: ROOM_ID,
+    roomDocId: ROOM_DOC_ID,
     playerName: "玩家",
     answer: "測試答案",
     gameRound: 1,
@@ -552,6 +553,18 @@ test("answer create rejects another uid", async () => {
     setDoc(
       doc(firestoreFor(OTHER_UID), "answers", "answer-document"),
       answerData()
+    )
+  );
+});
+
+test("answer create requires canonical roomDocId", async () => {
+  const legacyAnswer = answerData();
+  delete legacyAnswer.roomDocId;
+
+  await assertFails(
+    setDoc(
+      doc(firestoreFor(PLAYER_UID), "answers", "legacy-answer"),
+      legacyAnswer
     )
   );
 });

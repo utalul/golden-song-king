@@ -250,6 +250,7 @@ service cloud.firestore {
     function hasValidAnswerData(data) {
       return data.keys().hasOnly([
         'roomId',
+        'roomDocId',
         'playerName',
         'answer',
         'gameRound',
@@ -268,6 +269,8 @@ service cloud.firestore {
         ])
         && data.roomId is string
         && data.roomId.matches('^[0-9]{6}$')
+        && data.roomDocId is string
+        && data.roomDocId.size() > 0
         && data.playerName is string
         && data.playerName.size() > 0
         && data.playerName.size() <= 50

@@ -412,8 +412,31 @@ export default function Game() {
 
   useEffect(() => {
     if (!roomData) return;
+    if (!roomDocId) return;
 
-    const answerQuery = query(
+    const canonicalAnswerQuery = query(
+      collection(db, "answers"),
+
+      where(
+        "roomDocId",
+        "==",
+        roomDocId
+      ),
+
+      where(
+        "gameRound",
+        "==",
+        roomData.gameRound
+      ),
+
+      where(
+        "questionNumber",
+        "==",
+        roomData.currentQuestion
+      )
+    );
+
+    const legacyAnswerQuery = query(
       collection(db, "answers"),
 
       where(
@@ -435,30 +458,55 @@ export default function Game() {
       )
     );
 
-    const unsubscribeAnswers =
-      onSnapshot(
-        answerQuery,
-        (snapshot) => {
-          const list = [];
+    let canonicalAnswers = [];
+    let legacyAnswers = [];
 
-          snapshot.forEach(
-            (docSnap) => {
-              list.push({
-                id: docSnap.id,
-                ...docSnap.data()
-              });
-            }
-          );
+    const publishAnswers = () => {
+      const answersById = new Map();
 
-          setAnswers(list);
+      for (const answer of canonicalAnswers) {
+        answersById.set(answer.id, answer);
+      }
+
+      for (const answer of legacyAnswers) {
+        if (!answer.roomDocId) {
+          answersById.set(answer.id, answer);
         }
-      );
+      }
 
-    return () =>
-      unsubscribeAnswers();
+      setAnswers([...answersById.values()]);
+    };
+
+    const unsubscribeCanonicalAnswers = onSnapshot(
+      canonicalAnswerQuery,
+      (snapshot) => {
+        canonicalAnswers = snapshot.docs.map((docSnap) => ({
+          id: docSnap.id,
+          ...docSnap.data()
+        }));
+        publishAnswers();
+      }
+    );
+
+    const unsubscribeLegacyAnswers = onSnapshot(
+      legacyAnswerQuery,
+      (snapshot) => {
+        legacyAnswers = snapshot.docs.map((docSnap) => ({
+          id: docSnap.id,
+          ...docSnap.data()
+        }));
+        publishAnswers();
+      }
+    );
+
+    return () => {
+      unsubscribeCanonicalAnswers();
+      unsubscribeLegacyAnswers();
+    };
   }, [
     roomId,
-    roomData
+    roomData,
+    roomDocId
   ]);
 
   useEffect(() => {
@@ -563,6 +611,11 @@ export default function Game() {
         return;
       }
 
+      if (!roomDocId || !roomId) {
+        console.error("無法建立答案：缺少 canonical roomDocId 或公開房號");
+        return;
+      }
+
       await addDoc(
         collection(
           db,
@@ -570,6 +623,7 @@ export default function Game() {
         ),
         {
           roomId,
+          roomDocId,
           playerName,
           uid: authUser.uid,
 
